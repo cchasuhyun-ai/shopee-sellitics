@@ -219,8 +219,36 @@ def process_pdf(pdf_path, force_ocr: bool = False, lang: str = "kor+eng"):
     return page_tables, raw_records
 
 
+TARGET_TABLE_TITLE = "3.해외배송 내역"
+
+
+def _normalize_title(title) -> str:
+    """표제목 비교용: 공백 차이(예: "3. 해외배송  내역")를 무시하기 위해 공백을 모두 제거합니다."""
+    return "".join(str(title).split())
+
+
+def _is_target_table(title) -> bool:
+    return _normalize_title(title) == _normalize_title(TARGET_TABLE_TITLE)
+
+
+def _drop_empty_columns(df: pd.DataFrame, protect=()):
+    """모든 값이 비어있는(NaN 또는 공백) 열을 제거합니다. 서로 다른 표를 이어붙이면서
+    생기는 빈 열(다른 표에만 있던 칸)을 화면/엑셀에 보여주지 않기 위함입니다."""
+    cols_to_drop = []
+    for col in df.columns:
+        if col in protect:
+            continue
+        stripped = df[col].astype(str).str.strip()
+        is_empty = stripped.isin(["", "nan", "None"]) | df[col].isna()
+        if is_empty.all():
+            cols_to_drop.append(col)
+    return df.drop(columns=cols_to_drop)
+
+
 def build_result_sheets(results_by_file: dict):
     """여러 PDF의 처리 결과를 취합해서 엑셀 시트용 DataFrame들을 만듭니다.
+    표제목이 "3.해외배송 내역"인 표만 결과에 포함하고, 그 결과 값이 전혀 들어오지 않는
+    열은 표시하지 않습니다.
 
     results_by_file: {파일명: (page_tables, raw_records)}
     반환: (combined_df, sheet_data(dict), raw_df)
@@ -233,11 +261,12 @@ def build_result_sheets(results_by_file: dict):
         for page_no, line_no, text in raw_records:
             all_raw_records.append((filename, page_no, line_no, text))
 
-        if not page_tables:
+        target_tables = [t for t in page_tables if _is_target_table(t[1])]
+        if not target_tables:
             continue
 
         per_file_dfs = []
-        for page_no, title, df in page_tables:
+        for page_no, title, df in target_tables:
             df = df.copy()
             df.insert(0, "표제목", title)
             df.insert(0, "페이지", page_no)
@@ -248,14 +277,17 @@ def build_result_sheets(results_by_file: dict):
             all_combined_tables.append(combined_df)
 
         file_df = pd.concat(per_file_dfs, ignore_index=True, sort=False)
+        file_df = _drop_empty_columns(file_df, protect=("페이지", "표제목"))
         safe_name = "".join(c for c in Path(filename).stem if c not in r'[]:*?/\\')[:31]
         sheet_data[safe_name or Path(filename).stem[:31]] = file_df
 
-    combined_df = (
-        pd.concat(all_combined_tables, ignore_index=True, sort=False)
-        if all_combined_tables
-        else pd.DataFrame({"안내": ["표로 인식된 내용이 없습니다. '원본텍스트' 시트를 확인하세요."]})
-    )
+    if all_combined_tables:
+        combined_df = pd.concat(all_combined_tables, ignore_index=True, sort=False)
+        combined_df = _drop_empty_columns(combined_df, protect=("출처파일", "페이지", "표제목"))
+    else:
+        combined_df = pd.DataFrame(
+            {"안내": [f"표제목이 '{TARGET_TABLE_TITLE}'인 표를 찾지 못했습니다. '원본텍스트' 시트를 확인하세요."]}
+        )
     raw_df = pd.DataFrame(all_raw_records, columns=["출처파일", "페이지", "줄번호", "내용"])
 
     return combined_df, sheet_data, raw_df

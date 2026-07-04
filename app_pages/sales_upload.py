@@ -102,10 +102,10 @@ if "combined_df" in st.session_state:
     tab1, tab2 = st.tabs(["취합 결과", "원본텍스트 (백업용)"])
 
     with tab1:
-        st.dataframe(st.session_state["combined_df"], use_container_width=True)
+        st.dataframe(st.session_state["combined_df"], width='stretch')
 
     with tab2:
-        st.dataframe(st.session_state["raw_df"], use_container_width=True)
+        st.dataframe(st.session_state["raw_df"], width='stretch')
 
     # 엑셀 파일 생성 (메모리 상에서 바로 생성 -> 서버에 파일을 남기지 않음)
     excel_buffer = io.BytesIO()

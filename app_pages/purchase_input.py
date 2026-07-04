@@ -145,7 +145,7 @@ if "purchase_tax_summary" in st.session_state:
     with result_col1:
         st.metric("공제받을 매입세액 (차감계)", f"{st.session_state['purchase_tax_net_total']:,.0f} 원")
     with result_col2:
-        st.dataframe(st.session_state["purchase_tax_summary"], use_container_width=True, hide_index=True)
+        st.dataframe(st.session_state["purchase_tax_summary"], width='stretch', hide_index=True)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:

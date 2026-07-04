@@ -10,6 +10,7 @@ Shopee Sellitics 웹앱 진입점
     - 소포수령증 업로드 (app_pages/sales_upload.py)
 - 매입
     - 매입세액 입력 (app_pages/purchase_input.py)
+    - 카드사용내역 (app_pages/card_usage.py)
 """
 
 import streamlit as st
@@ -22,6 +23,7 @@ pages = {
     ],
     "매입": [
         st.Page("app_pages/purchase_input.py", title="매입세액 입력"),
+        st.Page("app_pages/card_usage.py", title="카드사용내역"),
     ],
 }
 
