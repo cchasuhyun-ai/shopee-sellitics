@@ -6,8 +6,13 @@
 
 부가세 신고기한(상반기/하반기) 판정
 ------------------------------------
-신고 대상 연도/반기를 선택하면, 표의 '발송일자'를 기준으로 그 기간에 포함되지 않는
-행은 빨간색으로 표시하고 합계 계산에서 제외합니다.
+신고 대상 연도/반기를 선택하면, 표의 '발송일자'를 기준으로 그 기간에 포함되는 행만
+합계 계산에 반영합니다.
+
+환율/원화환산금액
+------------------------------------
+'도착국가'와 '발송일자'를 기준으로 smbs.biz의 날짜별 매매기준율을 조회해서 환율과
+원화환산금액 열을 자동으로 추가합니다(exchange_rate.py 참고).
 
 취합 결과 수정 및 저장
 ------------------------------------
@@ -32,8 +37,9 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font
 
+from exchange_rate import fetch_exchange_rates, get_currency_for_country
 from pdf_processor import (
     VAT_DATE_COLUMN,
     VAT_HALF_OPTIONS,
@@ -42,21 +48,43 @@ from pdf_processor import (
     build_summary_row,
     check_korean_ocr_support,
     get_vat_period,
+    parse_date_flexible,
     process_pdf,
+    to_numeric_series,
 )
 
+ARRIVAL_COUNTRY_COLUMN = "도착국가"
 
-def _make_row_highlighter(summary_row_idx, in_period_mask):
-    """미리보기 표에서 합계 행은 굵게, 신고기간을 벗어난 행은 빨간색으로 표시하는 스타일 함수 생성."""
 
-    def _highlight(row):
-        if row.name == summary_row_idx:
-            return ["font-weight: bold; background-color: rgba(127, 127, 127, 0.2)"] * len(row)
-        if not in_period_mask.iloc[row.name]:
-            return ["background-color: #ffcdd2; color: #b71c1c"] * len(row)
-        return [""] * len(row)
+def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> pd.DataFrame:
+    """'도착국가'와 '발송일자'를 기준으로 환율/원화환산금액 열을 제일 우측에 추가합니다.
+    국가를 인식하지 못하거나 해당 날짜의 환율을 가져오지 못하면 빈 값으로 둡니다."""
+    df = df.copy()
+    if ARRIVAL_COUNTRY_COLUMN not in df.columns:
+        return df
 
-    return _highlight
+    convert_col = amount_cols[0] if amount_cols else None
+    rate_values = []
+    krw_values = []
+    for _, row in df.iterrows():
+        currency_code = get_currency_for_country(row.get(ARRIVAL_COUNTRY_COLUMN))
+        ship_date = parse_date_flexible(row.get(VAT_DATE_COLUMN))
+        rate = None
+        if currency_code and pd.notna(ship_date):
+            rate = fetch_exchange_rates(ship_date.date()).get(currency_code)
+
+        krw_amount = None
+        if rate is not None and convert_col is not None:
+            amount = to_numeric_series(pd.Series([row.get(convert_col)])).iloc[0]
+            if pd.notna(amount):
+                krw_amount = amount * rate
+
+        rate_values.append(rate)
+        krw_values.append(f"{krw_amount:,.0f}" if krw_amount is not None else "")
+
+    df["환율"] = rate_values
+    df["원화환산금액"] = krw_values
+    return df
 
 
 st.title("소포수령증 업로드")
@@ -81,10 +109,7 @@ with period_col2:
     vat_half = st.radio("신고기간(반기)", VAT_HALF_OPTIONS, index=default_half_index, horizontal=True)
 
 period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
-st.info(
-    f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}\n\n"
-    f"'{VAT_DATE_COLUMN}'이 이 기간을 벗어나거나 인식되지 않는 행은 취합 결과에서 빨간색으로 표시되고 합계에서 제외됩니다."
-)
+st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
 
 # ------------------------------------------------------------------
 # (참고) 한글 OCR 지원 여부 확인 - 서버에 Tesseract 한국어 언어팩이 없으면 경고 표시
@@ -161,8 +186,8 @@ if "combined_df" in st.session_state:
     confirmed = st.session_state.get("sales_confirmed", False)
 
     active_df = combined_df
-    in_period_mask = None
     preview_df = combined_df
+    summary_row_idx = None
 
     tab1, tab2 = st.tabs(["취합 결과", "원본텍스트 (백업용)"])
 
@@ -189,22 +214,16 @@ if "combined_df" in st.session_state:
 
         if has_aggregated_table:
             in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
-            excluded_count = int((~in_period_mask).sum())
-            if excluded_count:
-                st.warning(
-                    f"신고기간({period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d})을 벗어나거나 "
-                    f"'{VAT_DATE_COLUMN}'을 인식하지 못한 {excluded_count}건은 아래 표에서 빨간색으로 표시되며 합계에서 제외됩니다."
-                )
+            result_df = add_exchange_rate_columns(active_df, amount_cols)
 
-            summary_row = build_summary_row(active_df, in_period_mask, amount_cols)
-            preview_df = pd.concat([active_df, pd.DataFrame([summary_row])], ignore_index=True)
-            summary_row_idx = len(active_df)
+            summary_row = build_summary_row(result_df, in_period_mask, amount_cols)
+            if "원화환산금액" in result_df.columns:
+                krw_total = to_numeric_series(result_df.loc[in_period_mask, "원화환산금액"]).fillna(0).sum()
+                summary_row["원화환산금액"] = f"{krw_total:,.0f}"
+            preview_df = pd.concat([result_df, pd.DataFrame([summary_row])], ignore_index=True)
+            summary_row_idx = len(result_df)
 
-            st.caption("빨간색: 신고기간 외(합계 제외) · 굵게 표시: 합계")
-            st.dataframe(
-                preview_df.style.apply(_make_row_highlighter(summary_row_idx, in_period_mask), axis=1),
-                width='stretch',
-            )
+            st.dataframe(preview_df, width='stretch')
 
             if not confirmed:
                 if st.button("저장", type="primary"):
@@ -227,7 +246,6 @@ if "combined_df" in st.session_state:
     # 엑셀 파일 생성 (메모리 상에서 바로 생성 -> 서버에 파일을 남기지 않음)
     # 화면에 표시 중인 현재 값(수정 중이면 수정본, 저장했으면 확정본) 기준으로 만듭니다.
     export_df = preview_df
-    summary_row_idx = len(active_df) if has_aggregated_table else None
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
@@ -236,19 +254,13 @@ if "combined_df" in st.session_state:
             df.to_excel(writer, sheet_name=sheet_name, index=False)
         st.session_state["raw_df"].to_excel(writer, sheet_name="원본텍스트", index=False)
 
-        if in_period_mask is not None:
+        if summary_row_idx is not None:
             worksheet = writer.sheets["취합"]
-            red_fill = PatternFill(start_color="FFCDD2", end_color="FFCDD2", fill_type="solid")
             bold_font = Font(bold=True)
             n_cols = export_df.shape[1]
-            for row_idx in range(len(export_df)):
-                excel_row = row_idx + 2  # 1행은 헤더
-                if row_idx == summary_row_idx:
-                    for col_idx in range(1, n_cols + 1):
-                        worksheet.cell(row=excel_row, column=col_idx).font = bold_font
-                elif not in_period_mask.iloc[row_idx]:
-                    for col_idx in range(1, n_cols + 1):
-                        worksheet.cell(row=excel_row, column=col_idx).fill = red_fill
+            excel_row = summary_row_idx + 2  # 1행은 헤더
+            for col_idx in range(1, n_cols + 1):
+                worksheet.cell(row=excel_row, column=col_idx).font = bold_font
     excel_buffer.seek(0)
 
     st.download_button(
