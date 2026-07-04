@@ -11,6 +11,9 @@ Shopee Sellitics 웹앱 진입점
 - 매입
     - 매입세액 입력 (app_pages/purchase_input.py)
     - 카드사용내역 (app_pages/card_usage.py)
+- 부가세
+    - 부가세 계산 (app_pages/vat_calculation.py)
+    - 부가세 신고서식 (app_pages/vat_forms.py)
 """
 
 import streamlit as st
@@ -24,6 +27,10 @@ pages = {
     "매입": [
         st.Page("app_pages/purchase_input.py", title="매입세액 입력"),
         st.Page("app_pages/card_usage.py", title="카드사용내역"),
+    ],
+    "부가세": [
+        st.Page("app_pages/vat_calculation.py", title="부가세 계산"),
+        st.Page("app_pages/vat_forms.py", title="부가세 신고서식"),
     ],
 }
 
