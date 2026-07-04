@@ -7,11 +7,14 @@
 
 ```
 webapp/
- ├── app.py               ← 화면(웹페이지) 코드
- ├── pdf_processor.py     ← PDF 처리 핵심 로직
- ├── requirements.txt     ← 필요한 파이썬 라이브러리 목록
- ├── packages.txt         ← 필요한 시스템 프로그램 목록 (Tesseract, Poppler)
- └── README.md            ← 이 파일
+ ├── app.py                          ← 사이드바 내비게이션 진입점
+ ├── app_pages/
+ │    ├── sales_upload.py            ← [매출] 소포수령증 업로드 화면
+ │    └── purchase_input.py          ← [매입] 매입세액 입력 화면
+ ├── pdf_processor.py                ← PDF 처리 핵심 로직
+ ├── requirements.txt                ← 필요한 파이썬 라이브러리 목록
+ ├── packages.txt                    ← 필요한 시스템 프로그램 목록 (Tesseract, Poppler)
+ └── README.md                       ← 이 파일
 ```
 
 ---
@@ -34,8 +37,8 @@ GitHub는 코드를 저장해두는 온라인 창고입니다. Streamlit이 이 
 
 1. 방금 만든 저장소 페이지에서 **"uploading an existing file"** 링크 클릭
    (또는 저장소 화면의 **Add file → Upload files** 버튼)
-2. 이 폴더 안의 5개 파일(`app.py`, `pdf_processor.py`, `requirements.txt`, `packages.txt`, `README.md`)을
-   전부 드래그 앤 드롭으로 올리기
+2. 이 폴더 전체(`app.py`, `app_pages/` 폴더, `pdf_processor.py`, `requirements.txt`, `packages.txt`, `README.md`)를
+   전부 드래그 앤 드롭으로 올리기 (`app_pages/` 폴더 구조가 그대로 유지되어야 합니다)
 3. 아래 **Commit changes** 버튼 클릭
 
 ## 4단계: Streamlit Community Cloud로 배포
