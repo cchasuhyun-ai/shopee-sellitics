@@ -39,7 +39,7 @@ import pandas as pd
 import streamlit as st
 from openpyxl.styles import Font
 
-from exchange_rate import fetch_exchange_rates, get_currency_for_country
+from exchange_rate import fetch_exchange_rates, get_currency_for_country, get_display_country_name
 from pdf_processor import (
     VAT_DATE_COLUMN,
     VAT_HALF_OPTIONS,
@@ -67,6 +67,7 @@ def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> tuple:
         return df, {}
 
     convert_col = amount_cols[0] if amount_cols else None
+    display_countries = []
     rate_values = []
     krw_values = []
     unmatched_countries = set()
@@ -96,9 +97,11 @@ def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> tuple:
             if pd.notna(amount):
                 krw_amount = amount * rate
 
+        display_countries.append(get_display_country_name(country_raw))
         rate_values.append(rate)
         krw_values.append(f"{krw_amount:,.0f}" if krw_amount is not None else "")
 
+    df[ARRIVAL_COUNTRY_COLUMN] = display_countries
     df["환율"] = rate_values
     df["원화환산금액"] = krw_values
 

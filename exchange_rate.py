@@ -21,6 +21,12 @@ COUNTRY_CODE_TO_CURRENCY = {
     "TH": "THB", "PH": "PHP", "VN": "VND", "MX": "MXN",
 }
 
+# 소포수령증의 '도착국가' 표기(2자리 국가 코드)를 한글 국가명으로 바꾸기 위한 매핑
+COUNTRY_CODE_TO_NAME = {
+    "BR": "브라질", "SG": "싱가포르", "MY": "말레이시아", "TW": "대만",
+    "TH": "태국", "PH": "필리핀", "VN": "베트남", "MX": "멕시코",
+}
+
 # 소포수령증의 '도착국가' 표기(한글)에서 통화 코드를 추정하기 위한 매핑
 COUNTRY_TO_CURRENCY = {
     "일본": "JPY", "중국": "CNH", "유럽": "EUR", "유로": "EUR", "영국": "GBP",
@@ -148,3 +154,17 @@ def get_currency_for_country(country_text):
         if name in text:
             return code
     return None
+
+
+def get_display_country_name(country_text):
+    """'도착국가' 표기를 화면/엑셀에 보여줄 한글 국가명으로 변환합니다.
+    이미 한글 국가명이 포함되어 있으면 원래 값을 그대로 두고, 'BR' 같은
+    2자리 국가 코드인 경우에만 COUNTRY_CODE_TO_NAME으로 바꿔줍니다."""
+    if not country_text:
+        return country_text
+    text = str(country_text).strip()
+    if not text:
+        return country_text
+    if any(name in text for name in COUNTRY_TO_CURRENCY):
+        return country_text
+    return COUNTRY_CODE_TO_NAME.get(text.upper(), country_text)
