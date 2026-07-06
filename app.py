@@ -6,6 +6,8 @@ Shopee Sellitics 웹앱 진입점
 
 카테고리 구성
 -------------
+- 안내
+    - 부가세 신고안내 (app_pages/vat_guide.py)
 - 매출
     - 소포수령증 업로드 (app_pages/sales_upload.py)
 - 매입
@@ -21,8 +23,11 @@ import streamlit as st
 st.set_page_config(page_title="Shopee Sellitics", layout="wide")
 
 pages = {
+    "안내": [
+        st.Page("app_pages/vat_guide.py", title="부가세 신고안내", default=True),
+    ],
     "매출": [
-        st.Page("app_pages/sales_upload.py", title="소포수령증 업로드", default=True),
+        st.Page("app_pages/sales_upload.py", title="소포수령증 업로드"),
     ],
     "매입": [
         st.Page("app_pages/purchase_input.py", title="매입세액 입력"),
