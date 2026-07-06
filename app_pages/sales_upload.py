@@ -301,15 +301,13 @@ if "combined_df" in st.session_state:
     excel_buffer.seek(0)
 
     if has_aggregated_table and not confirmed:
-        download_col, save_col, _spacer_col = st.columns([1, 1, 6])
-        with download_col:
+        with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
             st.download_button(
                 label="계산결과 다운로드",
                 data=excel_buffer,
                 file_name="취합결과.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-        with save_col:
             if st.button("저장", type="primary"):
                 st.session_state["confirmed_df"] = active_df.reset_index(drop=True)
                 st.session_state["sales_confirmed"] = True
