@@ -113,21 +113,34 @@ st.divider()
 # ------------------------------------------------------------------
 # 2) 매출세액 - 그 밖의 과세(일반) 매출
 # ------------------------------------------------------------------
-st.subheader("2. 그 밖의 과세 매출 (일반, 10%, 해당 시 입력)")
+st.subheader("2. 그 밖의 과세 매출 (일반, 10%)")
 st.write(
-    "해외배송 외에 국내 판매 등 세율 10%가 적용되는 매출이 있다면 공급가액과 세액을 "
-    "직접 입력하세요. 해당 사항이 없으면 0으로 두면 됩니다."
+    "해외배송 영세율 매출 외에 세금계산서·신용카드매출전표·현금영수증 등으로 발생한 "
+    "국내 과세 매출(세율 10%)이 있다면 '그 밖의 매출 입력' 탭에서 확정한 값을 가져옵니다."
 )
 
-reg_col1, reg_col2 = st.columns(2)
-with reg_col1:
-    regular_sales_base = st.number_input(
-        "과세 매출 공급가액 (원)", min_value=0.0, step=1000.0, key="vc_regular_base"
+if st.session_state.get("other_sales_confirmed") and "other_sales_supply_total" in st.session_state:
+    regular_sales_base = float(st.session_state["other_sales_supply_total"])
+    regular_sales_tax = float(st.session_state["other_sales_tax_total"])
+    reg_col1, reg_col2 = st.columns(2)
+    with reg_col1:
+        st.metric("과세 매출 공급가액", f"{regular_sales_base:,.0f} 원")
+    with reg_col2:
+        st.metric("과세 매출 세액", f"{regular_sales_tax:,.0f} 원")
+    st.caption("'그 밖의 매출 입력' 탭에서 확정한 값입니다.")
+else:
+    st.warning(
+        "아직 '그 밖의 매출 입력' 탭에서 확정한 값이 없습니다. 해당 사항이 없으면 0으로 두어도 됩니다."
     )
-with reg_col2:
-    regular_sales_tax = st.number_input(
-        "과세 매출 세액 (원)", min_value=0.0, step=100.0, key="vc_regular_tax"
-    )
+    reg_col1, reg_col2 = st.columns(2)
+    with reg_col1:
+        regular_sales_base = st.number_input(
+            "과세 매출 공급가액 (원) - 직접 입력", min_value=0.0, step=1000.0, key="vc_regular_base"
+        )
+    with reg_col2:
+        regular_sales_tax = st.number_input(
+            "과세 매출 세액 (원) - 직접 입력", min_value=0.0, step=100.0, key="vc_regular_tax"
+        )
 
 st.divider()
 
