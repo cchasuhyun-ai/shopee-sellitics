@@ -90,8 +90,9 @@ def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> pd.DataFrame:
 st.title("소포수령증 업로드")
 st.caption("매출 · 소포수령증 PDF 취합")
 st.write(
-    "PDF 파일들을 업로드하면 표를 자동으로 인식해서 하나로 취합합니다. "
-    "결과를 화면에서 확인하고 엑셀 파일로 다운로드할 수 있습니다."
+    "소포수령증을 PDF로 업로드하면 매출내역을 하나의 표로 취합합니다. "
+    "결과를 화면에서 확인하고 누락되거나 잘못 입력된 값을 수정하세요. "
+    "완료된 데이터는 엑셀 파일로 다운로드 할 수 있습니다."
 )
 
 # ------------------------------------------------------------------
@@ -102,7 +103,7 @@ st.subheader("부가세 신고기한 설정")
 today = date.today()
 default_half_index = 0 if today.month <= 6 else 1
 
-period_col1, period_col2 = st.columns(2)
+period_col1, period_col2 = st.columns([1, 3])
 with period_col1:
     vat_year = st.number_input("신고연도", min_value=2000, max_value=2100, value=today.year, step=1)
 with period_col2:
@@ -127,7 +128,7 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
 )
 
-force_ocr = st.checkbox("모든 페이지를 OCR로 강제 처리 (스캔본이 많을 때 체크)", value=False)
+force_ocr = st.checkbox("모든 페이지를 OCR로 처리 (PDF 파일을 스캔하여 그림파일로 인식되는 경우 체크)", value=False)
 
 # TODO(로그인 연동): 로그인 기능을 붙이면 여기서 현재 로그인한 사용자 정보를 가져와서
 # 아래 처리 결과를 사용자 ID와 함께 저장하도록 확장하면 됩니다.
