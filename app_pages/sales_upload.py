@@ -55,20 +55,22 @@ from pdf_processor import (
 )
 
 ARRIVAL_COUNTRY_COLUMN = "도착국가"
+EXPORT_AMOUNT_COLUMN = "수출신고금액"
 
 
-def add_exchange_rate_columns(df: pd.DataFrame, convert_col) -> tuple:
+def add_exchange_rate_columns(df: pd.DataFrame, convert_col: str) -> tuple:
     """'도착국가'와 '발송일자'를 기준으로 화폐/환율/원화환산금액 열을 제일 우측에 추가합니다.
+    원화환산금액 = convert_col(기본값: '수출신고금액') 값 * 환율.
     (화폐는 환율 바로 왼쪽에 위치하며, 그 화폐 기준으로 환율을 조회합니다.)
     '발송일자' 값은 인식에 성공하면 'YYYY/MM/DD' 형태로 통일해서 다시 채워 넣습니다.
     국가를 인식하지 못하거나 해당 날짜의 환율을 가져오지 못하면 빈 값으로 둡니다.
-    convert_col: 원화환산금액 계산에 사용할 금액 컬럼명 (호출부에서 사용자가 선택한 값).
 
     반환: (환율 열이 추가된 df, 원인 파악용 진단 정보 dict)
     """
     df = df.copy()
+    actual_columns = ", ".join(str(c) for c in df.columns)
     if ARRIVAL_COUNTRY_COLUMN not in df.columns:
-        return df, {}
+        return df, {f"'{ARRIVAL_COUNTRY_COLUMN}' 컬럼을 찾을 수 없음": [f"현재 표의 실제 컬럼: {actual_columns}"]}
 
     display_countries = []
     display_dates = []
@@ -120,6 +122,10 @@ def add_exchange_rate_columns(df: pd.DataFrame, convert_col) -> tuple:
         "발송일자를 인식하지 못한 값": sorted(unmatched_dates),
         "환율 조회에 실패한 통화/일자": sorted(unmatched_rates),
     }
+    if VAT_DATE_COLUMN not in df.columns:
+        issues[f"'{VAT_DATE_COLUMN}' 컬럼을 찾을 수 없음"] = [f"현재 표의 실제 컬럼: {actual_columns}"]
+    if convert_col not in df.columns:
+        issues[f"'{convert_col}' 컬럼을 찾을 수 없음"] = [f"현재 표의 실제 컬럼: {actual_columns}"]
     return df, issues
 
 
@@ -248,20 +254,7 @@ if "combined_df" in st.session_state:
 
     if has_aggregated_table:
         in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
-
-        convert_col = None
-        if amount_cols:
-            preferred = next((c for c in amount_cols if ("금액" in c) or ("가격" in c)), amount_cols[0])
-            convert_col = st.selectbox(
-                "원화환산금액 계산에 사용할 금액 컬럼을 선택하세요",
-                amount_cols,
-                index=amount_cols.index(preferred),
-                key="krw_convert_col",
-            )
-        else:
-            st.warning("금액으로 인식되는 컬럼을 찾지 못해 원화환산금액을 계산할 수 없습니다.")
-
-        result_df, rate_issues = add_exchange_rate_columns(active_df, convert_col)
+        result_df, rate_issues = add_exchange_rate_columns(active_df, EXPORT_AMOUNT_COLUMN)
 
         summary_row = build_summary_row(result_df, in_period_mask, amount_cols)
         if "원화환산금액" in result_df.columns:
