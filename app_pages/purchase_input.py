@@ -3,7 +3,8 @@
 ====================
 부가가치세 신고서의 "매입세액" 항목을 사용자가 직접 입력할 수 있는 페이지입니다.
 국세청 부가가치세 신고서 서식의 매입세액 구분을 그대로 따라가며, 입력한 공급가액/
-세액을 바탕으로 합계와 차감계(공제받을 매입세액)를 자동으로 계산합니다.
+세액을 바탕으로 합계와 차감계(공제받을 매입세액)를 입력하는 즉시 자동으로 계산해서
+보여줍니다.
 
 신용카드매출전표 등 수취명세서 제출분(일반매입/고정자산매입)은 '카드사용내역 입력'
 탭에서 저장(확정)한 값이 있으면 자동으로 채워집니다. 계산 결과를 확인한 뒤 '저장'
@@ -16,6 +17,7 @@ import io
 import pandas as pd
 import streamlit as st
 
+from amount_input import amount_input
 from pdf_processor import VAT_HALF_OPTIONS
 
 st.title("매입세액 입력")
@@ -65,19 +67,13 @@ def render_item_inputs(items, section_key):
         tax_key = f"{section_key}_{key}_tax"
         if has_supply:
             with cols[1]:
-                supply = st.number_input(
-                    "공급가액", min_value=0, step=1000, key=supply_key, label_visibility="collapsed"
-                )
+                supply = amount_input("공급가액", supply_key)
             with cols[2]:
-                tax = st.number_input(
-                    "세액", min_value=0, step=100, key=tax_key, label_visibility="collapsed"
-                )
+                tax = amount_input("세액", tax_key)
         else:
             supply = 0
             with cols[1]:
-                tax = st.number_input(
-                    "세액", min_value=0, step=100, key=tax_key, label_visibility="collapsed"
-                )
+                tax = amount_input("세액", tax_key)
         values[key] = {"label": label, "supply": supply, "tax": tax}
     return values
 
@@ -99,13 +95,9 @@ def render_card_receipt_items():
                 st.markdown(f"{tax:,.0f}")
         else:
             with cols[1]:
-                supply = st.number_input(
-                    "공급가액", min_value=0, step=1000, key=f"sec3_{key}_supply", label_visibility="collapsed"
-                )
+                supply = amount_input("공급가액", f"sec3_{key}_supply")
             with cols[2]:
-                tax = st.number_input(
-                    "세액", min_value=0, step=100, key=f"sec3_{key}_tax", label_visibility="collapsed"
-                )
+                tax = amount_input("세액", f"sec3_{key}_tax")
         values[key] = {"label": label, "supply": supply, "tax": tax}
     if card_usage_confirmed:
         st.caption("'카드사용내역 입력' 탭에서 확정한 값입니다.")
@@ -114,19 +106,47 @@ def render_card_receipt_items():
     return values
 
 
-def render_purchase_results():
-    """세션에 저장된 계산 결과를 화면에 표시하고, 다운로드용 엑셀 버퍼를 반환합니다."""
-    st.subheader(f"계산 결과 - {st.session_state['purchase_tax_period']}")
+def build_summary(all_deductible, non_deductible_values):
+    """매입세액 항목들을 집계해서 (요약 표, 차감계) 를 반환합니다."""
+    deductible_supply_total = sum(v["supply"] for v in all_deductible.values())
+    deductible_tax_total = sum(v["tax"] for v in all_deductible.values())
+
+    non_deductible_supply_total = sum(v["supply"] for v in non_deductible_values.values())
+    non_deductible_tax_total = sum(v["tax"] for v in non_deductible_values.values())
+
+    net_tax_total = deductible_tax_total - non_deductible_tax_total
+
+    rows = []
+    for v in all_deductible.values():
+        rows.append({"구분": v["label"], "공급가액": v["supply"], "세액": v["tax"]})
+    rows.append({"구분": "매입세액 합계", "공급가액": deductible_supply_total, "세액": deductible_tax_total})
+    for v in non_deductible_values.values():
+        rows.append({"구분": v["label"], "공급가액": v["supply"], "세액": v["tax"]})
+    rows.append(
+        {
+            "구분": "공제받지 못할 매입세액 합계",
+            "공급가액": non_deductible_supply_total,
+            "세액": non_deductible_tax_total,
+        }
+    )
+    rows.append({"구분": "차감계 (공제받을 매입세액)", "공급가액": None, "세액": net_tax_total})
+
+    return pd.DataFrame(rows), net_tax_total
+
+
+def render_purchase_results(period_label, summary_df, net_total):
+    """계산 결과를 화면에 표시하고, 다운로드용 엑셀 버퍼를 반환합니다."""
+    st.subheader(f"계산 결과 - {period_label}")
 
     result_col1, result_col2 = st.columns(2)
     with result_col1:
-        st.metric("공제받을 매입세액 (차감계)", f"{st.session_state['purchase_tax_net_total']:,.0f} 원")
+        st.metric("공제받을 매입세액 (차감계)", f"{net_total:,.0f} 원")
     with result_col2:
-        st.dataframe(st.session_state["purchase_tax_summary"], width='stretch', hide_index=True)
+        st.dataframe(summary_df, width='stretch', hide_index=True)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-        st.session_state["purchase_tax_summary"].to_excel(writer, sheet_name="매입세액", index=False)
+        summary_df.to_excel(writer, sheet_name="매입세액", index=False)
     excel_buffer.seek(0)
     return excel_buffer
 
@@ -145,94 +165,78 @@ if not confirmed:
 
     st.divider()
 
-    with st.form("purchase_tax_form"):
-        st.subheader("세금계산서 수취분")
-        header_cols = st.columns([3, 1, 1])
-        header_cols[1].markdown("**공급가액**")
-        header_cols[2].markdown("**세액**")
-        tax_invoice_values = render_item_inputs(TAX_INVOICE_ITEMS, "sec1")
+    st.subheader("세금계산서 수취분")
+    header_cols = st.columns([3, 1, 1])
+    header_cols[1].markdown("**공급가액**")
+    header_cols[2].markdown("**세액**")
+    tax_invoice_values = render_item_inputs(TAX_INVOICE_ITEMS, "sec1")
 
-        st.subheader("예정신고 누락분 / 매입자발행 세금계산서")
-        header_cols = st.columns([3, 1, 1])
-        header_cols[1].markdown("**공급가액**")
-        header_cols[2].markdown("**세액**")
-        misc_values = render_item_inputs(MISC_ITEMS, "sec2")
+    st.subheader("예정신고 누락분 / 매입자발행 세금계산서")
+    header_cols = st.columns([3, 1, 1])
+    header_cols[1].markdown("**공급가액**")
+    header_cols[2].markdown("**세액**")
+    misc_values = render_item_inputs(MISC_ITEMS, "sec2")
 
-        with st.expander("그 밖의 공제매입세액 (펼쳐서 입력)", expanded=True):
-            st.markdown(
-                """
-                <style>
-                div.st-key-card_receipt_highlight {
-                    background-color: rgba(255, 193, 7, 0.15);
-                }
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-            with st.container(key="card_receipt_highlight", border=True):
-                card_values = render_card_receipt_items()
-            other_values = render_item_inputs(OTHER_DEDUCTIBLE_ITEMS, "sec3")
-
-        with st.expander("공제받지 못할 매입세액 (펼쳐서 입력)", expanded=True):
-            non_deductible_values = render_item_inputs(NON_DEDUCTIBLE_ITEMS, "sec4")
-
-        submitted = st.form_submit_button("계산하기", type="primary")
-
-    if submitted:
-        all_deductible = {**tax_invoice_values, **misc_values, **card_values, **other_values}
-
-        deductible_supply_total = sum(v["supply"] for v in all_deductible.values())
-        deductible_tax_total = sum(v["tax"] for v in all_deductible.values())
-
-        non_deductible_supply_total = sum(v["supply"] for v in non_deductible_values.values())
-        non_deductible_tax_total = sum(v["tax"] for v in non_deductible_values.values())
-
-        net_tax_total = deductible_tax_total - non_deductible_tax_total
-
-        rows = []
-        for v in all_deductible.values():
-            rows.append({"구분": v["label"], "공급가액": v["supply"], "세액": v["tax"]})
-        rows.append({"구분": "매입세액 합계", "공급가액": deductible_supply_total, "세액": deductible_tax_total})
-        for v in non_deductible_values.values():
-            rows.append({"구분": v["label"], "공급가액": v["supply"], "세액": v["tax"]})
-        rows.append(
-            {
-                "구분": "공제받지 못할 매입세액 합계",
-                "공급가액": non_deductible_supply_total,
-                "세액": non_deductible_tax_total,
+    with st.expander("그 밖의 공제매입세액 (펼쳐서 입력)", expanded=True):
+        st.markdown(
+            """
+            <style>
+            div.st-key-card_receipt_highlight {
+                background-color: rgba(255, 193, 7, 0.15);
             }
+            </style>
+            """,
+            unsafe_allow_html=True,
         )
-        rows.append({"구분": "차감계 (공제받을 매입세액)", "공급가액": None, "세액": net_tax_total})
+        with st.container(key="card_receipt_highlight", border=True):
+            card_values = render_card_receipt_items()
+        other_values = render_item_inputs(OTHER_DEDUCTIBLE_ITEMS, "sec3")
 
-        summary_df = pd.DataFrame(rows)
+    with st.expander("공제받지 못할 매입세액 (펼쳐서 입력)", expanded=True):
+        non_deductible_values = render_item_inputs(NON_DEDUCTIBLE_ITEMS, "sec4")
+        st.caption(
+            "**참고** (개인사업자에게 주로 발생하는 불공제 항목 예시)\n"
+            "- 공제받지 못할 매입세액: 사업과 무관한 지출(가사경비), 비영업용 소형승용차(개별소비세 "
+            "과세대상, 8인승 이하 승용차) 구입·유지비, 거래처 접대비 관련 매입세액, 세금계산서를 "
+            "받지 못했거나 필요적 기재사항이 부실한 매입 등\n"
+            "- 공통매입세액 면세사업분: 과세·면세 겸용 사업자가 공통으로 사용한 매입 중 면세사업에 "
+            "대응하는 매입세액\n"
+            "- 대손처분받은 세액: 이미 대손세액공제를 받았던 매출채권을 이후 회수한 경우 등"
+        )
 
-        st.session_state["purchase_tax_summary"] = summary_df
-        st.session_state["purchase_tax_period"] = f"{int(report_year)}년 {report_term}"
-        st.session_state["purchase_tax_net_total"] = net_tax_total
+    st.divider()
 
-    if "purchase_tax_summary" in st.session_state:
-        st.divider()
-        excel_buffer = render_purchase_results()
-        st.write("계산 결과 확인을 마쳤으면 '저장' 버튼을 눌러 매입세액을 확정하세요.")
-        with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
-            st.download_button(
-                label="다운로드",
-                data=excel_buffer,
-                file_name=f"매입세액_{st.session_state['purchase_tax_period']}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-            if st.button("저장", type="primary"):
-                st.session_state["purchase_confirmed"] = True
-                st.rerun()
-    else:
-        st.info("항목을 입력한 뒤 '계산하기' 버튼을 눌러주세요.")
+    all_deductible = {**tax_invoice_values, **misc_values, **card_values, **other_values}
+    summary_df, net_tax_total = build_summary(all_deductible, non_deductible_values)
+    period_label = f"{int(report_year)}년 {report_term}"
+
+    excel_buffer = render_purchase_results(period_label, summary_df, net_tax_total)
+
+    st.write("계산 결과 확인을 마쳤으면 '저장' 버튼을 눌러 매입세액을 확정하세요.")
+    with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
+        st.download_button(
+            label="다운로드",
+            data=excel_buffer,
+            file_name=f"매입세액_{period_label}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        if st.button("저장", type="primary"):
+            st.session_state["purchase_tax_summary"] = summary_df
+            st.session_state["purchase_tax_period"] = period_label
+            st.session_state["purchase_tax_net_total"] = net_tax_total
+            st.session_state["purchase_confirmed"] = True
+            st.rerun()
 else:
     st.success(
         f"{st.session_state.get('purchase_tax_period', '')} 값이 확정되어 저장되었습니다. "
         "'부가세 계산' 탭에서 이 값을 자동으로 불러옵니다."
     )
     st.divider()
-    excel_buffer = render_purchase_results()
+    excel_buffer = render_purchase_results(
+        st.session_state["purchase_tax_period"],
+        st.session_state["purchase_tax_summary"],
+        st.session_state["purchase_tax_net_total"],
+    )
     with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
         st.download_button(
             label="다운로드",

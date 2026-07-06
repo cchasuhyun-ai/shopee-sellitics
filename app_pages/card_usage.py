@@ -105,8 +105,8 @@ edited_df = st.data_editor(
     column_config={
         "거래일자": st.column_config.DateColumn("거래일자"),
         "구분": st.column_config.SelectboxColumn("구분", options=CATEGORY_OPTIONS, default="일반매입"),
-        "공급가액": st.column_config.NumberColumn("공급가액", min_value=0, step=100),
-        "세액": st.column_config.NumberColumn("세액", min_value=0, step=10),
+        "공급가액": st.column_config.NumberColumn("공급가액", min_value=0, step=100, format="%,d"),
+        "세액": st.column_config.NumberColumn("세액", min_value=0, step=10, format="%,d"),
     },
     key="card_usage_manual_editor",
     disabled=confirmed,

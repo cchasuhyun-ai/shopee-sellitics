@@ -303,7 +303,7 @@ if "combined_df" in st.session_state:
     if has_aggregated_table and not confirmed:
         with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
             st.download_button(
-                label="계산결과 다운로드",
+                label="다운로드",
                 data=excel_buffer,
                 file_name="취합결과.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -323,7 +323,7 @@ if "combined_df" in st.session_state:
                 st.rerun()
     else:
         st.download_button(
-            label="계산결과 다운로드",
+            label="다운로드",
             data=excel_buffer,
             file_name="취합결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

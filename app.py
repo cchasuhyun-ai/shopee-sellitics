@@ -20,7 +20,10 @@ NAV_ITEMS의 순서를 바꾸면 배지 CSS도 함께 맞춰서 수정해야 합
 
 import streamlit as st
 
+from amount_input import inject_amount_input_css
+
 st.set_page_config(page_title="Shopee Sellitics", layout="wide")
+inject_amount_input_css()
 
 NAV_ITEMS = [
     ("안내", st.Page("app_pages/vat_guide.py", title="부가세 신고안내", default=True)),

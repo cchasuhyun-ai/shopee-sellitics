@@ -140,7 +140,7 @@ with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
 excel_buffer.seek(0)
 
 st.download_button(
-    label="엑셀 파일 다운로드",
+    label="다운로드",
     data=excel_buffer,
     file_name=f"부가세계산_{int(vat_year)}년_{vat_half}.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

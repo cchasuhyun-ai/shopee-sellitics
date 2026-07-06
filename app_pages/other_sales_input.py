@@ -16,6 +16,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+from amount_input import amount_input
 from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
 
 st.title("그 밖의 매출 입력")
@@ -84,23 +85,9 @@ for key, label in OTHER_SALES_ITEMS:
     with cols[0]:
         st.markdown(label)
     with cols[1]:
-        supply = st.number_input(
-            "공급가액",
-            min_value=0,
-            step=1000,
-            key=f"os_{key}_supply",
-            label_visibility="collapsed",
-            disabled=confirmed,
-        )
+        supply = amount_input("공급가액", f"os_{key}_supply", disabled=confirmed)
     with cols[2]:
-        tax = st.number_input(
-            "세액",
-            min_value=0,
-            step=100,
-            key=f"os_{key}_tax",
-            label_visibility="collapsed",
-            disabled=confirmed,
-        )
+        tax = amount_input("세액", f"os_{key}_tax", disabled=confirmed)
     item_values[key] = {"label": label, "supply": supply, "tax": tax}
 
 supply_total = sum(v["supply"] for v in item_values.values())
