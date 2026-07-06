@@ -190,59 +190,53 @@ if "combined_df" in st.session_state:
     preview_df = combined_df
     summary_row_idx = None
 
-    tab1, tab2 = st.tabs(["취합 결과", "원본텍스트 (백업용)"])
+    if not has_aggregated_table:
+        st.dataframe(combined_df, width='stretch')
+    elif confirmed:
+        active_df = st.session_state["confirmed_df"]
+        st.success("값이 확정되어 저장되었습니다. 값을 다시 고치려면 아래 버튼을 누르세요.")
+        if st.button("다시 수정하기"):
+            st.session_state["sales_confirmed"] = False
+            st.rerun()
+    else:
+        st.write(
+            "표에 잘못 인식된 값이 있으면 셀을 더블클릭해서 직접 수정하거나, 표 아래쪽 "
+            "'+'/휴지통 아이콘으로 행을 추가·삭제하세요. 문제가 없으면 '저장' 버튼을 눌러 값을 확정합니다."
+        )
+        active_df = st.data_editor(
+            combined_df,
+            num_rows="dynamic",
+            width='stretch',
+            key="combined_editor",
+        )
 
-    with tab1:
-        if not has_aggregated_table:
-            st.dataframe(combined_df, width='stretch')
-        elif confirmed:
-            active_df = st.session_state["confirmed_df"]
-            st.success("값이 확정되어 저장되었습니다. 값을 다시 고치려면 아래 버튼을 누르세요.")
-            if st.button("다시 수정하기"):
-                st.session_state["sales_confirmed"] = False
+    if has_aggregated_table:
+        in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
+        result_df = add_exchange_rate_columns(active_df, amount_cols)
+
+        summary_row = build_summary_row(result_df, in_period_mask, amount_cols)
+        if "원화환산금액" in result_df.columns:
+            krw_total = to_numeric_series(result_df.loc[in_period_mask, "원화환산금액"]).fillna(0).sum()
+            summary_row["원화환산금액"] = f"{krw_total:,.0f}"
+        preview_df = pd.concat([result_df, pd.DataFrame([summary_row])], ignore_index=True)
+        summary_row_idx = len(result_df)
+
+        st.dataframe(preview_df, width='stretch')
+
+        if not confirmed:
+            if st.button("저장", type="primary"):
+                st.session_state["confirmed_df"] = active_df.reset_index(drop=True)
+                st.session_state["sales_confirmed"] = True
+
+                # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
+                # 예시:
+                #   save_result_to_db(
+                #       user_id=user.id,
+                #       combined_df=st.session_state["confirmed_df"],
+                #       raw_df=st.session_state["raw_df"],
+                #   )
+
                 st.rerun()
-        else:
-            st.write(
-                "표에 잘못 인식된 값이 있으면 셀을 더블클릭해서 직접 수정하거나, 표 아래쪽 "
-                "'+'/휴지통 아이콘으로 행을 추가·삭제하세요. 문제가 없으면 '저장' 버튼을 눌러 값을 확정합니다."
-            )
-            active_df = st.data_editor(
-                combined_df,
-                num_rows="dynamic",
-                width='stretch',
-                key="combined_editor",
-            )
-
-        if has_aggregated_table:
-            in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
-            result_df = add_exchange_rate_columns(active_df, amount_cols)
-
-            summary_row = build_summary_row(result_df, in_period_mask, amount_cols)
-            if "원화환산금액" in result_df.columns:
-                krw_total = to_numeric_series(result_df.loc[in_period_mask, "원화환산금액"]).fillna(0).sum()
-                summary_row["원화환산금액"] = f"{krw_total:,.0f}"
-            preview_df = pd.concat([result_df, pd.DataFrame([summary_row])], ignore_index=True)
-            summary_row_idx = len(result_df)
-
-            st.dataframe(preview_df, width='stretch')
-
-            if not confirmed:
-                if st.button("저장", type="primary"):
-                    st.session_state["confirmed_df"] = active_df.reset_index(drop=True)
-                    st.session_state["sales_confirmed"] = True
-
-                    # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
-                    # 예시:
-                    #   save_result_to_db(
-                    #       user_id=user.id,
-                    #       combined_df=st.session_state["confirmed_df"],
-                    #       raw_df=st.session_state["raw_df"],
-                    #   )
-
-                    st.rerun()
-
-    with tab2:
-        st.dataframe(st.session_state["raw_df"], width='stretch')
 
     # 엑셀 파일 생성 (메모리 상에서 바로 생성 -> 서버에 파일을 남기지 않음)
     # 화면에 표시 중인 현재 값(수정 중이면 수정본, 저장했으면 확정본) 기준으로 만듭니다.
