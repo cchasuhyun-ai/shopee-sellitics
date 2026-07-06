@@ -9,8 +9,8 @@ Shopee Sellitics 웹앱 진입점
 - [안내] 부가세 신고안내 (app_pages/vat_guide.py)
 - [매출] 소포수령증 업로드 (app_pages/sales_upload.py)
 - [매출] 그 밖의 매출 입력 (app_pages/other_sales_input.py)
+- [매입] 카드사용내역 입력 (app_pages/card_usage.py)
 - [매입] 매입세액 입력 (app_pages/purchase_input.py)
-- [매입] 카드사용내역 (app_pages/card_usage.py)
 - [부가세] 부가세 계산 (app_pages/vat_calculation.py)
 
 카테고리 그룹 헤더(아코디언) 대신, 각 탭 이름 앞에 작은 배지로 카테고리를
@@ -26,8 +26,8 @@ NAV_ITEMS = [
     ("안내", st.Page("app_pages/vat_guide.py", title="부가세 신고안내", default=True)),
     ("매출", st.Page("app_pages/sales_upload.py", title="소포수령증 업로드")),
     ("매출", st.Page("app_pages/other_sales_input.py", title="그 밖의 매출 입력")),
+    ("매입", st.Page("app_pages/card_usage.py", title="카드사용내역 입력")),
     ("매입", st.Page("app_pages/purchase_input.py", title="매입세액 입력")),
-    ("매입", st.Page("app_pages/card_usage.py", title="카드사용내역")),
     ("부가세", st.Page("app_pages/vat_calculation.py", title="부가세 계산")),
 ]
 

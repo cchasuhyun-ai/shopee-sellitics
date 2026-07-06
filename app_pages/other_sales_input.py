@@ -37,7 +37,7 @@ confirmed = st.session_state.get("other_sales_confirmed", False)
 # ------------------------------------------------------------------
 # 0) 신고기간 선택
 # ------------------------------------------------------------------
-st.subheader("신고기간")
+st.subheader("부가세 신고기한 설정")
 
 today = date.today()
 default_half_index = 0 if today.month <= 6 else 1
@@ -106,6 +106,14 @@ for key, label in OTHER_SALES_ITEMS:
 supply_total = sum(v["supply"] for v in item_values.values())
 tax_total = sum(v["tax"] for v in item_values.values())
 
+st.caption(
+    "**입력 예시** (개인사업자가 주로 입력하게 되는 항목)\n"
+    "- 세금계산서 발급분: 국내 거래처에 물품·용역을 공급하고 세금계산서를 발행한 매출\n"
+    "- 신용카드매출전표 · 현금영수증 발행분: 스마트스토어 등 국내 오픈마켓 판매분, "
+    "매장·사무실에서 카드결제·현금영수증으로 받은 매출\n"
+    "- 기타(정규영수증 외 매출분): 간이영수증만 발행했거나 증빙 없이 현금으로 받은 매출 등"
+)
+
 st.divider()
 
 # ------------------------------------------------------------------
@@ -163,7 +171,7 @@ if confirmed:
     )
     with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
         st.download_button(
-            label="계산결과 다운로드",
+            label="다운로드",
             data=excel_buffer,
             file_name="그밖의매출입력.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -175,7 +183,7 @@ else:
     st.write("입력과 증빙 업로드를 모두 마쳤으면 '저장' 버튼을 눌러 매출 및 매출세액을 확정하세요.")
     with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
         st.download_button(
-            label="계산결과 다운로드",
+            label="다운로드",
             data=excel_buffer,
             file_name="그밖의매출입력.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
