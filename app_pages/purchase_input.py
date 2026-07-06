@@ -159,7 +159,9 @@ if not confirmed:
     # ------------------------------------------------------------------
     period_col1, period_col2 = st.columns([1, 5])
     with period_col1:
-        report_year = st.number_input("과세연도", min_value=2000, max_value=2100, value=2026, step=1)
+        report_year = st.number_input(
+            "과세연도", min_value=2000, max_value=2100, value=2026, step=1, key="period_year"
+        )
     with period_col2:
         report_term = st.radio("과세기간", VAT_HALF_OPTIONS, horizontal=True)
 

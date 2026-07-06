@@ -85,6 +85,10 @@ hr {
     margin: 1.6rem 0;
     border-color: #E2E8F0;
 }
+
+div[class*="st-key-period_year"] input {
+    text-align: center !important;
+}
 </style>
 """
 

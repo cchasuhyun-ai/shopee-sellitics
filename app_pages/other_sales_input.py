@@ -51,7 +51,7 @@ with period_col1:
         max_value=2100,
         value=today.year,
         step=1,
-        key="os_year",
+        key="period_year",
         disabled=confirmed,
     )
 with period_col2:

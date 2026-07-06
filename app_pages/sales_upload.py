@@ -148,7 +148,9 @@ default_half_index = 0 if today.month <= 6 else 1
 
 period_col1, period_col2 = st.columns([1, 5])
 with period_col1:
-    vat_year = st.number_input("신고연도", min_value=2000, max_value=2100, value=today.year, step=1)
+    vat_year = st.number_input(
+        "신고연도", min_value=2000, max_value=2100, value=today.year, step=1, key="period_year"
+    )
 with period_col2:
     vat_half = st.radio("신고기간(반기)", VAT_HALF_OPTIONS, index=default_half_index, horizontal=True)
 
