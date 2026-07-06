@@ -14,6 +14,8 @@ Shopee Sellitics 웹앱 진입점
 - 부가세
     - 부가세 계산 (app_pages/vat_calculation.py)
     - 부가세 신고서식 (app_pages/vat_forms.py)
+- 환율
+    - 환율 조회 확인 (app_pages/exchange_rate_check.py)
 """
 
 import streamlit as st
@@ -31,6 +33,9 @@ pages = {
     "부가세": [
         st.Page("app_pages/vat_calculation.py", title="부가세 계산"),
         st.Page("app_pages/vat_forms.py", title="부가세 신고서식"),
+    ],
+    "환율": [
+        st.Page("app_pages/exchange_rate_check.py", title="환율 조회 확인"),
     ],
 }
 
