@@ -56,22 +56,39 @@ from pdf_processor import (
 ARRIVAL_COUNTRY_COLUMN = "도착국가"
 
 
-def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> pd.DataFrame:
+def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> tuple:
     """'도착국가'와 '발송일자'를 기준으로 환율/원화환산금액 열을 제일 우측에 추가합니다.
-    국가를 인식하지 못하거나 해당 날짜의 환율을 가져오지 못하면 빈 값으로 둡니다."""
+    국가를 인식하지 못하거나 해당 날짜의 환율을 가져오지 못하면 빈 값으로 둡니다.
+
+    반환: (환율 열이 추가된 df, 원인 파악용 진단 정보 dict)
+    """
     df = df.copy()
     if ARRIVAL_COUNTRY_COLUMN not in df.columns:
-        return df
+        return df, {}
 
     convert_col = amount_cols[0] if amount_cols else None
     rate_values = []
     krw_values = []
+    unmatched_countries = set()
+    unmatched_dates = set()
+    unmatched_rates = set()
     for _, row in df.iterrows():
-        currency_code = get_currency_for_country(row.get(ARRIVAL_COUNTRY_COLUMN))
-        ship_date = parse_date_flexible(row.get(VAT_DATE_COLUMN))
+        country_raw = row.get(ARRIVAL_COUNTRY_COLUMN)
+        date_raw = row.get(VAT_DATE_COLUMN)
+        currency_code = get_currency_for_country(country_raw)
+        ship_date = parse_date_flexible(date_raw)
         rate = None
-        if currency_code and pd.notna(ship_date):
+
+        if currency_code is None:
+            if pd.notna(country_raw) and str(country_raw).strip():
+                unmatched_countries.add(str(country_raw).strip())
+        elif pd.isna(ship_date):
+            if pd.notna(date_raw) and str(date_raw).strip():
+                unmatched_dates.add(str(date_raw).strip())
+        else:
             rate = fetch_exchange_rates(ship_date.date()).get(currency_code)
+            if rate is None:
+                unmatched_rates.add(f"{currency_code} ({ship_date.date():%Y-%m-%d})")
 
         krw_amount = None
         if rate is not None and convert_col is not None:
@@ -84,7 +101,13 @@ def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> pd.DataFrame:
 
     df["환율"] = rate_values
     df["원화환산금액"] = krw_values
-    return df
+
+    issues = {
+        "도착국가를 인식하지 못한 값": sorted(unmatched_countries),
+        "발송일자를 인식하지 못한 값": sorted(unmatched_dates),
+        "환율 조회에 실패한 통화/일자": sorted(unmatched_rates),
+    }
+    return df, issues
 
 
 st.title("소포수령증 업로드")
@@ -212,7 +235,7 @@ if "combined_df" in st.session_state:
 
     if has_aggregated_table:
         in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
-        result_df = add_exchange_rate_columns(active_df, amount_cols)
+        result_df, rate_issues = add_exchange_rate_columns(active_df, amount_cols)
 
         summary_row = build_summary_row(result_df, in_period_mask, amount_cols)
         if "원화환산금액" in result_df.columns:
@@ -222,6 +245,10 @@ if "combined_df" in st.session_state:
         summary_row_idx = len(result_df)
 
         st.dataframe(preview_df, width='stretch')
+
+        issue_lines = [f"- {label}: {', '.join(values)}" for label, values in rate_issues.items() if values]
+        if issue_lines:
+            st.warning("일부 행의 환율을 채우지 못했습니다. 원인:\n" + "\n".join(issue_lines))
 
         if not confirmed:
             if st.button("저장", type="primary"):
