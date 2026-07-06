@@ -46,7 +46,6 @@ from pdf_processor import (
     VAT_HALF_OPTIONS,
     apply_vat_period_filter,
     build_result_sheets,
-    build_summary_row,
     check_korean_ocr_support,
     get_vat_period,
     parse_date_flexible,
@@ -255,14 +254,11 @@ if "combined_df" in st.session_state:
         )
 
     if has_aggregated_table:
-        in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
+        in_period_mask, _ = apply_vat_period_filter(active_df, period_start, period_end)
         result_df, rate_issues = add_exchange_rate_columns(active_df, EXPORT_AMOUNT_COLUMN)
 
-        # 발송수량/수출신고금액은 합계를 표시하지 않고, 원화환산금액만 합계로 표시합니다.
-        summary_amount_cols = [
-            col for col in amount_cols if col not in (SHIPMENT_QTY_COLUMN, EXPORT_AMOUNT_COLUMN)
-        ]
-        summary_row = build_summary_row(result_df, in_period_mask, summary_amount_cols)
+        # 합계 행에는 원화환산금액의 합계만 표시하고, 나머지 열은 비워 둡니다.
+        summary_row = {col: "" for col in result_df.columns}
         if KRW_AMOUNT_COLUMN in result_df.columns:
             krw_total = to_numeric_series(result_df.loc[in_period_mask, KRW_AMOUNT_COLUMN]).fillna(0).sum()
             summary_row[KRW_AMOUNT_COLUMN] = f"{krw_total:,.0f}"
@@ -275,9 +271,8 @@ if "combined_df" in st.session_state:
             for col in right_align_cols
             if col in preview_df.columns
         }
-        st.caption(
-            "아래 표는 선택한 신고기간(발행일 기준)에 해당하는 내역만 집계한 결과입니다. "
-            "마지막 행은 합계이며, 발송수량과 수출신고금액은 표시하지 않고 원화환산금액만 합계로 표시합니다."
+        st.success(
+            "입력된 소포수령증 업로드 결과 중 선택한 신고기간에 대한 매출액을 집계하고 원화로 환산한 결과는 다음과 같습니다."
         )
         st.dataframe(preview_df, width='stretch', column_config=column_config)
 
@@ -306,7 +301,7 @@ if "combined_df" in st.session_state:
     excel_buffer.seek(0)
 
     if has_aggregated_table and not confirmed:
-        download_col, save_col = st.columns(2)
+        download_col, save_col, _spacer_col = st.columns([1, 1, 6])
         with download_col:
             st.download_button(
                 label="계산결과 다운로드",
