@@ -298,7 +298,7 @@ def build_result_sheets(results_by_file: dict):
 # 부가세 신고기한(상반기/하반기) 판정 및 기간 외 데이터 배제
 # ----------------------------------------------------------------------
 
-VAT_DATE_COLUMN = "발송일자"
+VAT_DATE_COLUMN = "발행일"
 VAT_HALF_OPTIONS = ("상반기", "하반기")
 VAT_META_COLUMNS = ("출처파일", "페이지", "표제목")
 

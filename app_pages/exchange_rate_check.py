@@ -4,7 +4,7 @@
 smbs.biz에서 날짜별 환율이 실제로 잘 조회되는지 직접 확인해보는 화면입니다.
 소포수령증 업로드 탭에서 사용하는 것과 동일한 exchange_rate.py 로직을
 그대로 사용하므로, 여기서 정상적으로 나오는데 취합 결과 표에서 계속
-None/빈 값이 나온다면 도착국가/발송일자 값 자체(또는 인식 실패)가
+None/빈 값이 나온다면 도착국가/발행일 값 자체(또는 인식 실패)가
 원인일 가능성이 높습니다.
 """
 
@@ -21,7 +21,7 @@ st.write(
     "태국/필리핀/베트남/멕시코)의 환율을 smbs.biz에서 직접 조회해서 보여줍니다."
 )
 
-selected_date = st.date_input("조회할 발송일자", value=date.today())
+selected_date = st.date_input("조회할 발행일", value=date.today())
 
 if st.button("환율 조회", type="primary"):
     with st.spinner("smbs.biz에서 환율을 조회하는 중..."):
