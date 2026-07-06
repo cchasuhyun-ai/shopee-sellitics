@@ -147,7 +147,7 @@ st.subheader("부가세 신고기한 설정")
 today = date.today()
 default_half_index = 0 if today.month <= 6 else 1
 
-period_col1, period_col2 = st.columns([1, 3])
+period_col1, period_col2 = st.columns([1, 5])
 with period_col1:
     vat_year = st.number_input("신고연도", min_value=2000, max_value=2100, value=today.year, step=1)
 with period_col2:
@@ -275,26 +275,15 @@ if "combined_df" in st.session_state:
             for col in right_align_cols
             if col in preview_df.columns
         }
+        st.caption(
+            "아래 표는 선택한 신고기간(발행일 기준)에 해당하는 내역만 집계한 결과입니다. "
+            "마지막 행은 합계이며, 발송수량과 수출신고금액은 표시하지 않고 원화환산금액만 합계로 표시합니다."
+        )
         st.dataframe(preview_df, width='stretch', column_config=column_config)
 
         issue_lines = [f"- {label}: {', '.join(values)}" for label, values in rate_issues.items() if values]
         if issue_lines:
             st.warning("일부 행의 환율을 채우지 못했습니다. 원인:\n" + "\n".join(issue_lines))
-
-        if not confirmed:
-            if st.button("저장", type="primary"):
-                st.session_state["confirmed_df"] = active_df.reset_index(drop=True)
-                st.session_state["sales_confirmed"] = True
-
-                # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
-                # 예시:
-                #   save_result_to_db(
-                #       user_id=user.id,
-                #       combined_df=st.session_state["confirmed_df"],
-                #       raw_df=st.session_state["raw_df"],
-                #   )
-
-                st.rerun()
 
     # 엑셀 파일 생성 (메모리 상에서 바로 생성 -> 서버에 파일을 남기지 않음)
     # 화면에 표시 중인 현재 값(수정 중이면 수정본, 저장했으면 확정본) 기준으로 만듭니다.
@@ -316,11 +305,35 @@ if "combined_df" in st.session_state:
                 worksheet.cell(row=excel_row, column=col_idx).font = bold_font
     excel_buffer.seek(0)
 
-    st.download_button(
-        label="엑셀 파일 다운로드",
-        data=excel_buffer,
-        file_name="취합결과.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    if has_aggregated_table and not confirmed:
+        download_col, save_col = st.columns(2)
+        with download_col:
+            st.download_button(
+                label="계산결과 다운로드",
+                data=excel_buffer,
+                file_name="취합결과.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        with save_col:
+            if st.button("저장", type="primary"):
+                st.session_state["confirmed_df"] = active_df.reset_index(drop=True)
+                st.session_state["sales_confirmed"] = True
+
+                # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
+                # 예시:
+                #   save_result_to_db(
+                #       user_id=user.id,
+                #       combined_df=st.session_state["confirmed_df"],
+                #       raw_df=st.session_state["raw_df"],
+                #   )
+
+                st.rerun()
+    else:
+        st.download_button(
+            label="계산결과 다운로드",
+            data=excel_buffer,
+            file_name="취합결과.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 else:
     st.info("PDF를 업로드하고 '취합 시작하기' 버튼을 눌러주세요.")
