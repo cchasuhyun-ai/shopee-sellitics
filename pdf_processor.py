@@ -332,6 +332,21 @@ def parse_date_flexible(value):
     normalized = text.replace("년", "-").replace("월", "-").replace("일", "")
     normalized = re.sub(r"[./]", "-", normalized)
     normalized = re.sub(r"-+", "-", normalized).strip(" -")
+
+    # 연-월-일 순서를 명시적으로 고정합니다. pd.to_datetime에 그냥 맡기면
+    # "26-07-03"처럼 연도가 2자리인 표기를 "일-월-연"으로 잘못 해석해
+    # (예: 2003-07-26으로 오인식) 전혀 다른 날짜가 되어버리는 문제가 있습니다.
+    parts = normalized.split("-")
+    if len(parts) == 3 and all(p.isdigit() for p in parts):
+        year_text, month_text, day_text = parts
+        try:
+            year = int(year_text)
+            if len(year_text) <= 2:
+                year += 2000
+            return pd.Timestamp(year=year, month=int(month_text), day=int(day_text))
+        except (ValueError, TypeError):
+            pass
+
     try:
         return pd.to_datetime(normalized)
     except (ValueError, TypeError):
