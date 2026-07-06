@@ -11,6 +11,8 @@ import io
 import pandas as pd
 import streamlit as st
 
+from pdf_processor import VAT_HALF_OPTIONS
+
 st.title("매입세액 입력")
 st.caption("매입 · 부가가치세 매입세액 계산")
 st.write(
@@ -21,11 +23,11 @@ st.write(
 # ------------------------------------------------------------------
 # 신고 기간 선택
 # ------------------------------------------------------------------
-period_col1, period_col2 = st.columns(2)
+period_col1, period_col2 = st.columns([1, 5])
 with period_col1:
     report_year = st.number_input("과세연도", min_value=2000, max_value=2100, value=2026, step=1)
 with period_col2:
-    report_term = st.selectbox("과세기간", ["1기 예정", "1기 확정", "2기 예정", "2기 확정"])
+    report_term = st.radio("과세기간", VAT_HALF_OPTIONS, horizontal=True)
 
 st.divider()
 
