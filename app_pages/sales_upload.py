@@ -9,10 +9,11 @@
 신고 대상 연도/반기를 선택하면, 표의 '발송일자'를 기준으로 그 기간에 포함되는 행만
 합계 계산에 반영합니다.
 
-환율/원화환산금액
+화폐/환율/원화환산금액
 ------------------------------------
-'도착국가'와 '발송일자'를 기준으로 smbs.biz의 날짜별 매매기준율을 조회해서 환율과
-원화환산금액 열을 자동으로 추가합니다(exchange_rate.py 참고).
+'도착국가'와 '발송일자'를 기준으로 화폐(통화코드)를 판별하고, smbs.biz의 날짜별
+매매기준율을 조회해서 화폐/환율/원화환산금액 열을 자동으로 추가합니다
+(exchange_rate.py 참고).
 
 취합 결과 수정 및 저장
 ------------------------------------
@@ -57,7 +58,8 @@ ARRIVAL_COUNTRY_COLUMN = "도착국가"
 
 
 def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> tuple:
-    """'도착국가'와 '발송일자'를 기준으로 환율/원화환산금액 열을 제일 우측에 추가합니다.
+    """'도착국가'와 '발송일자'를 기준으로 화폐/환율/원화환산금액 열을 제일 우측에 추가합니다.
+    (화폐는 환율 바로 왼쪽에 위치하며, 그 화폐 기준으로 환율을 조회합니다.)
     국가를 인식하지 못하거나 해당 날짜의 환율을 가져오지 못하면 빈 값으로 둡니다.
 
     반환: (환율 열이 추가된 df, 원인 파악용 진단 정보 dict)
@@ -68,6 +70,7 @@ def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> tuple:
 
     convert_col = amount_cols[0] if amount_cols else None
     display_countries = []
+    currency_values = []
     rate_values = []
     krw_values = []
     unmatched_countries = set()
@@ -98,10 +101,12 @@ def add_exchange_rate_columns(df: pd.DataFrame, amount_cols) -> tuple:
                 krw_amount = amount * rate
 
         display_countries.append(get_display_country_name(country_raw))
+        currency_values.append(currency_code or "")
         rate_values.append(rate)
         krw_values.append(f"{krw_amount:,.0f}" if krw_amount is not None else "")
 
     df[ARRIVAL_COUNTRY_COLUMN] = display_countries
+    df["화폐"] = currency_values
     df["환율"] = rate_values
     df["원화환산금액"] = krw_values
 
