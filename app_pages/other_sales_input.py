@@ -11,9 +11,12 @@
 """
 
 import io
+from datetime import date
 
 import pandas as pd
 import streamlit as st
+
+from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
 
 st.title("그 밖의 매출 입력")
 st.caption("매출 · 영세율 외 과세 매출 입력 및 증빙 업로드")
@@ -30,6 +33,40 @@ OTHER_SALES_ITEMS = [
 ]
 
 confirmed = st.session_state.get("other_sales_confirmed", False)
+
+# ------------------------------------------------------------------
+# 0) 신고기간 선택
+# ------------------------------------------------------------------
+st.subheader("신고기간")
+
+today = date.today()
+default_half_index = 0 if today.month <= 6 else 1
+
+period_col1, period_col2 = st.columns([1, 5])
+with period_col1:
+    vat_year = st.number_input(
+        "신고연도",
+        min_value=2000,
+        max_value=2100,
+        value=today.year,
+        step=1,
+        key="os_year",
+        disabled=confirmed,
+    )
+with period_col2:
+    vat_half = st.radio(
+        "신고기간(반기)",
+        VAT_HALF_OPTIONS,
+        index=default_half_index,
+        horizontal=True,
+        key="os_half",
+        disabled=confirmed,
+    )
+
+period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
+st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
+
+st.divider()
 
 # ------------------------------------------------------------------
 # 1) 과세 매출 항목별 입력
@@ -120,7 +157,10 @@ with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
 excel_buffer.seek(0)
 
 if confirmed:
-    st.success("값이 확정되어 저장되었습니다. '부가세 계산' 탭에서 이 값을 자동으로 불러옵니다.")
+    st.success(
+        f"{st.session_state.get('other_sales_period', '')} 값이 확정되어 저장되었습니다. "
+        "'부가세 계산' 탭에서 이 값을 자동으로 불러옵니다."
+    )
     with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
         st.download_button(
             label="계산결과 다운로드",
@@ -145,5 +185,6 @@ else:
             st.session_state["other_sales_supply_total"] = supply_total
             st.session_state["other_sales_tax_total"] = tax_total
             st.session_state["other_sales_evidence"] = evidence_files
+            st.session_state["other_sales_period"] = f"{int(vat_year)}년 {vat_half}"
             st.session_state["other_sales_confirmed"] = True
             st.rerun()
