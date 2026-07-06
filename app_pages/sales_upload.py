@@ -56,6 +56,8 @@ from pdf_processor import (
 
 ARRIVAL_COUNTRY_COLUMN = "도착국가"
 EXPORT_AMOUNT_COLUMN = "수출신고금액"
+SHIPMENT_QTY_COLUMN = "발송수량"
+KRW_AMOUNT_COLUMN = "원화환산금액"
 
 
 def add_exchange_rate_columns(df: pd.DataFrame, convert_col: str) -> tuple:
@@ -256,14 +258,24 @@ if "combined_df" in st.session_state:
         in_period_mask, amount_cols = apply_vat_period_filter(active_df, period_start, period_end)
         result_df, rate_issues = add_exchange_rate_columns(active_df, EXPORT_AMOUNT_COLUMN)
 
-        summary_row = build_summary_row(result_df, in_period_mask, amount_cols)
-        if "원화환산금액" in result_df.columns:
-            krw_total = to_numeric_series(result_df.loc[in_period_mask, "원화환산금액"]).fillna(0).sum()
-            summary_row["원화환산금액"] = f"{krw_total:,.0f}"
+        # 발송수량/수출신고금액은 합계를 표시하지 않고, 원화환산금액만 합계로 표시합니다.
+        summary_amount_cols = [
+            col for col in amount_cols if col not in (SHIPMENT_QTY_COLUMN, EXPORT_AMOUNT_COLUMN)
+        ]
+        summary_row = build_summary_row(result_df, in_period_mask, summary_amount_cols)
+        if KRW_AMOUNT_COLUMN in result_df.columns:
+            krw_total = to_numeric_series(result_df.loc[in_period_mask, KRW_AMOUNT_COLUMN]).fillna(0).sum()
+            summary_row[KRW_AMOUNT_COLUMN] = f"{krw_total:,.0f}"
         preview_df = pd.concat([result_df, pd.DataFrame([summary_row])], ignore_index=True)
         summary_row_idx = len(result_df)
 
-        st.dataframe(preview_df, width='stretch')
+        right_align_cols = [SHIPMENT_QTY_COLUMN, EXPORT_AMOUNT_COLUMN, KRW_AMOUNT_COLUMN]
+        column_config = {
+            col: st.column_config.TextColumn(col, alignment="right")
+            for col in right_align_cols
+            if col in preview_df.columns
+        }
+        st.dataframe(preview_df, width='stretch', column_config=column_config)
 
         issue_lines = [f"- {label}: {', '.join(values)}" for label, values in rate_issues.items() if values]
         if issue_lines:
