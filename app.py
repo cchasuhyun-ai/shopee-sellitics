@@ -21,8 +21,10 @@ NAV_ITEMS의 순서를 바꾸면 배지 CSS도 함께 맞춰서 수정해야 합
 import streamlit as st
 
 from amount_input import inject_amount_input_css
+from style import inject_app_style
 
 st.set_page_config(page_title="Shopee Sellitics", layout="wide")
+inject_app_style()
 inject_amount_input_css()
 
 NAV_ITEMS = [
@@ -48,7 +50,8 @@ st.markdown(
         margin-right: 6px;
         padding: 1px 7px;
         border-radius: 4px;
-        background-color: rgba(128, 128, 128, 0.18);
+        background-color: rgba(37, 99, 235, 0.12);
+        color: #1D4ED8;
         font-size: 0.72rem;
         font-weight: 600;
         vertical-align: middle;

@@ -20,7 +20,7 @@ TABLE_STYLE = """
     margin-bottom: 1rem;
 }
 .vat-guide-table th, .vat-guide-table td {
-    border: 1px solid rgba(128, 128, 128, 0.35);
+    border: 1px solid #E2E8F0;
     padding: 8px 10px;
     text-align: left;
     vertical-align: top;
@@ -31,7 +31,8 @@ TABLE_STYLE = """
     line-height: 1.5;
 }
 .vat-guide-table th {
-    background-color: rgba(128, 128, 128, 0.12);
+    background-color: #F8FAFC;
+    color: #1E293B;
     font-weight: 600;
 }
 </style>

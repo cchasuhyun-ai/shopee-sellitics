@@ -182,7 +182,8 @@ if not confirmed:
             """
             <style>
             div.st-key-card_receipt_highlight {
-                background-color: rgba(255, 193, 7, 0.15);
+                background-color: rgba(37, 99, 235, 0.06);
+                border-radius: 10px;
             }
             </style>
             """,
