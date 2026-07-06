@@ -12,6 +12,12 @@ import requests
 
 EXRATE_URL = "http://www.smbs.biz/ExRate/TodayExRate.jsp"
 
+# 소포수령증의 '도착국가' 표기(2자리 국가 코드)에서 통화 코드를 추정하기 위한 매핑
+COUNTRY_CODE_TO_CURRENCY = {
+    "BR": "BRL", "SG": "SGD", "MY": "MYR", "TW": "TWD",
+    "TH": "THB", "PH": "PHP", "VN": "VND", "MX": "MXN",
+}
+
 # 소포수령증의 '도착국가' 표기(한글)에서 통화 코드를 추정하기 위한 매핑
 COUNTRY_TO_CURRENCY = {
     "일본": "JPY", "중국": "CNH", "유럽": "EUR", "유로": "EUR", "영국": "GBP",
@@ -122,12 +128,14 @@ def fetch_exchange_rates(target_date):
 
 
 def get_currency_for_country(country_text):
-    """'도착국가' 표기(예: '필리핀', '베트남(하노이)')에서 통화 코드를 추정합니다."""
+    """'도착국가' 표기(예: 'BR', '필리핀', '베트남(하노이)')에서 통화 코드를 추정합니다."""
     if not country_text:
         return None
     text = str(country_text).strip()
     if not text:
         return None
+    if text.upper() in COUNTRY_CODE_TO_CURRENCY:
+        return COUNTRY_CODE_TO_CURRENCY[text.upper()]
     if text in COUNTRY_TO_CURRENCY:
         return COUNTRY_TO_CURRENCY[text]
     for name, code in COUNTRY_TO_CURRENCY.items():
