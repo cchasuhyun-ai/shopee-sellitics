@@ -246,6 +246,14 @@ def _drop_empty_columns(df: pd.DataFrame, protect=()):
     return df.drop(columns=cols_to_drop)
 
 
+def _format_date_slash(value):
+    """날짜 값을 'YYYY/MM/DD' 형태의 문자열로 바꿉니다. 인식 못하는 값은 원본 그대로 둡니다."""
+    parsed = parse_date_flexible(value)
+    if pd.isna(parsed):
+        return value
+    return parsed.strftime("%Y/%m/%d")
+
+
 def build_result_sheets(results_by_file: dict):
     """여러 PDF의 처리 결과를 취합해서 엑셀 시트용 DataFrame들을 만듭니다.
     표제목이 "3.해외배송 내역"인 표만 결과에 포함하고, 그 결과 값이 전혀 들어오지 않는
@@ -279,6 +287,8 @@ def build_result_sheets(results_by_file: dict):
 
         file_df = pd.concat(per_file_dfs, ignore_index=True, sort=False)
         file_df = _drop_empty_columns(file_df, protect=("페이지", "표제목"))
+        if VAT_DATE_COLUMN in file_df.columns:
+            file_df[VAT_DATE_COLUMN] = file_df[VAT_DATE_COLUMN].apply(_format_date_slash)
         safe_name = "".join(c for c in Path(filename).stem if c not in r'[]:*?/\\')[:31]
         sheet_data[safe_name or Path(filename).stem[:31]] = file_df
 
