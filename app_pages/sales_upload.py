@@ -158,6 +158,10 @@ with period_col2:
 
 period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
 st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
+st.caption(
+    "※ 매출 집계는 각 소포수령증의 발송일(선적일) 기준으로 판단합니다. "
+    "선택한 신고기간에 속하지 않는 발송일의 주문 건은 아래 원화환산 결과표에서 자동으로 제외됩니다."
+)
 
 st.divider()
 
@@ -270,12 +274,15 @@ if "combined_df" in st.session_state:
 
     if has_aggregated_table:
         in_period_mask, _ = apply_vat_period_filter(active_df, period_start, period_end)
-        result_df, rate_issues = add_exchange_rate_columns(active_df, EXPORT_AMOUNT_COLUMN)
+        excluded_count = int((~in_period_mask).sum())
+        # 발송일(선적일) 기준으로 신고기간에 속하지 않는 주문 건은 원화환산 결과표 자체에서 제외합니다.
+        filtered_df = active_df.loc[in_period_mask].reset_index(drop=True)
+        result_df, rate_issues = add_exchange_rate_columns(filtered_df, EXPORT_AMOUNT_COLUMN)
 
         # 합계 행에는 원화환산금액의 합계만 표시하고, 나머지 열은 비워 둡니다.
         summary_row = {col: "" for col in result_df.columns}
         if KRW_AMOUNT_COLUMN in result_df.columns:
-            krw_total = to_numeric_series(result_df.loc[in_period_mask, KRW_AMOUNT_COLUMN]).fillna(0).sum()
+            krw_total = to_numeric_series(result_df[KRW_AMOUNT_COLUMN]).fillna(0).sum()
             summary_row[KRW_AMOUNT_COLUMN] = f"{krw_total:,.0f}"
         preview_df = pd.concat([result_df, pd.DataFrame([summary_row])], ignore_index=True)
         summary_row_idx = len(result_df)
@@ -289,6 +296,10 @@ if "combined_df" in st.session_state:
         st.success(
             "입력된 소포수령증 업로드 결과 중 선택한 신고기간에 대한 매출액을 집계하고 원화로 환산한 결과는 다음과 같습니다."
         )
+        if excluded_count:
+            st.caption(
+                f"발송일(선적일)이 선택한 신고기간에 속하지 않는 {excluded_count}건은 위 결과에서 제외되었습니다."
+            )
         st.dataframe(preview_df, width='stretch', column_config=column_config)
 
         issue_lines = [f"- {label}: {', '.join(values)}" for label, values in rate_issues.items() if values]
@@ -320,7 +331,7 @@ if "combined_df" in st.session_state:
             st.download_button(
                 label="다운로드",
                 data=excel_buffer,
-                file_name="취합결과.xlsx",
+                file_name=f"{int(vat_year)}년_{vat_half}_소포수령증_취합결과.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
             if st.button("저장", type="primary"):
@@ -340,7 +351,7 @@ if "combined_df" in st.session_state:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="취합결과.xlsx",
+            file_name=f"{int(vat_year)}년_{vat_half}_소포수령증_취합결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 else:
