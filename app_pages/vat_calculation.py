@@ -63,7 +63,9 @@ missing_notices = []
 zero_rate_base = 0.0
 if st.session_state.get("sales_confirmed") and "confirmed_df" in st.session_state:
     sales_df = st.session_state["confirmed_df"]
-    if "출처파일" in sales_df.columns:
+    if sales_df.empty:
+        pass  # 업로드할 소포수령증이 없어 매출 없음(0)으로 확정된 경우
+    elif "출처파일" in sales_df.columns:
         in_period_mask, amount_cols = apply_vat_period_filter(sales_df, period_start, period_end)
         base_col = EXPORT_AMOUNT_COLUMN if EXPORT_AMOUNT_COLUMN in amount_cols else (
             amount_cols[0] if amount_cols else None

@@ -20,6 +20,8 @@
 자동 인식된 표에 잘못된 값이 있으면 사용자가 화면에서 직접 수정할 수 있습니다.
 수정 후 문제가 없으면 '저장' 버튼을 눌러 값을 확정합니다. 확정된 값은 다시 수정할
 때까지 그대로 유지되며, 엑셀 다운로드도 확정된 값을 기준으로 만들어집니다.
+업로드할 소포수령증이 없는 경우에도 '저장' 버튼을 눌러 매출 없음으로 확정할 수 있고,
+그래야 '부가세 계산' 탭에서 신고 금액 계산이 정상적으로 진행됩니다.
 
 [향후 로그인/사용자별 저장 기능 확장 지점]
 - 지금은 로그인 없이 "업로드 -> 처리 -> 수정 -> 저장(확정) -> 다운로드"만 지원합니다.
@@ -139,9 +141,9 @@ st.write(
 )
 
 # ------------------------------------------------------------------
-# 0) 부가세 신고기한 설정
+# 1) 부가세 신고기한 설정
 # ------------------------------------------------------------------
-st.subheader("부가세 신고기한 설정")
+st.subheader("1. 부가세 신고기한 설정")
 
 today = date.today()
 default_half_index = 0 if today.month <= 6 else 1
@@ -157,6 +159,8 @@ with period_col2:
 period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
 st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
 
+st.divider()
+
 # ------------------------------------------------------------------
 # (참고) 한글 OCR 지원 여부 확인 - 서버에 Tesseract 한국어 언어팩이 없으면 경고 표시
 # ------------------------------------------------------------------
@@ -165,8 +169,10 @@ if warning_msg:
     st.warning(warning_msg)
 
 # ------------------------------------------------------------------
-# 1) 파일 업로드
+# 2) 소포수령증 업로드
 # ------------------------------------------------------------------
+st.subheader("2. 소포수령증 업로드")
+
 uploaded_files = st.file_uploader(
     "PDF 파일을 선택하세요 (여러 개 선택 가능)",
     type=["pdf"],
@@ -221,9 +227,13 @@ if uploaded_files:
         st.session_state.pop("confirmed_df", None)
         st.session_state.pop("combined_editor", None)
 
+st.divider()
+
 # ------------------------------------------------------------------
-# 2) 결과 확인 + 수정 + 저장(확정) + 다운로드
+# 3) 확인 및 저장
 # ------------------------------------------------------------------
+st.subheader("3. 확인 및 저장")
+
 if "combined_df" in st.session_state:
     st.success("취합이 완료되었습니다.")
 
@@ -331,4 +341,25 @@ if "combined_df" in st.session_state:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 else:
-    st.info("PDF를 업로드하고 '취합 시작하기' 버튼을 눌러주세요.")
+    # 소포수령증을 업로드하지 않은 경우에도 '저장' 버튼을 항상 보여줘서,
+    # 매출 없음으로 확정하고 다음 단계('부가세 계산')로 넘어갈 수 있게 합니다.
+    confirmed = st.session_state.get("sales_confirmed", False)
+
+    if confirmed:
+        st.success("업로드할 소포수령증 없이 저장(확정)되었습니다. 값을 다시 등록하려면 아래 버튼을 누르세요.")
+        if st.button("다시 수정하기"):
+            st.session_state["sales_confirmed"] = False
+            st.session_state.pop("confirmed_df", None)
+            st.rerun()
+    else:
+        st.info(
+            "업로드할 소포수령증이 없는 경우, 아래 '저장' 버튼을 눌러주세요. "
+            "PDF가 있다면 위에서 파일을 선택한 뒤 '취합 시작하기' 버튼을 먼저 눌러 취합하세요."
+        )
+        if st.button("저장", type="primary"):
+            st.session_state["confirmed_df"] = pd.DataFrame(columns=["출처파일"])
+            st.session_state["sales_confirmed"] = True
+
+            # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
+
+            st.rerun()
