@@ -136,7 +136,7 @@ def build_summary(all_deductible, non_deductible_values):
 
 def render_purchase_results(period_label, summary_df, net_total):
     """계산 결과를 화면에 표시하고, 다운로드용 엑셀 버퍼를 반환합니다."""
-    st.subheader(f"4. 확인 및 저장 - {period_label}")
+    st.subheader(f"6. 확인 및 저장 - {period_label}")
 
     result_col1, result_col2 = st.columns(2)
     with result_col1:
@@ -180,33 +180,33 @@ if not confirmed:
     header_cols[2].markdown("**세액**")
     misc_values = render_item_inputs(MISC_ITEMS, "sec2")
 
-    with st.expander("그 밖의 공제매입세액 (펼쳐서 입력)", expanded=True):
-        st.markdown(
-            """
-            <style>
-            div.st-key-card_receipt_highlight {
-                background-color: rgba(37, 99, 235, 0.06);
-                border-radius: 10px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-        with st.container(key="card_receipt_highlight", border=True):
-            card_values = render_card_receipt_items()
-        other_values = render_item_inputs(OTHER_DEDUCTIBLE_ITEMS, "sec3")
+    st.subheader("4. 그 밖의 공제매입세액")
+    st.markdown(
+        """
+        <style>
+        div.st-key-card_receipt_highlight {
+            background-color: rgba(37, 99, 235, 0.06);
+            border-radius: 10px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.container(key="card_receipt_highlight", border=True):
+        card_values = render_card_receipt_items()
+    other_values = render_item_inputs(OTHER_DEDUCTIBLE_ITEMS, "sec3")
 
-    with st.expander("공제받지 못할 매입세액 (펼쳐서 입력)", expanded=True):
-        non_deductible_values = render_item_inputs(NON_DEDUCTIBLE_ITEMS, "sec4")
-        st.caption(
-            "**참고** (개인사업자에게 주로 발생하는 불공제 항목 예시)\n"
-            "- 공제받지 못할 매입세액: 사업과 무관한 지출(가사경비), 비영업용 소형승용차(개별소비세 "
-            "과세대상, 8인승 이하 승용차) 구입·유지비, 거래처 접대비 관련 매입세액, 세금계산서를 "
-            "받지 못했거나 필요적 기재사항이 부실한 매입 등\n"
-            "- 공통매입세액 면세사업분: 과세·면세 겸용 사업자가 공통으로 사용한 매입 중 면세사업에 "
-            "대응하는 매입세액\n"
-            "- 대손처분받은 세액: 이미 대손세액공제를 받았던 매출채권을 이후 회수한 경우 등"
-        )
+    st.subheader("5. 공제받지 못할 매입세액")
+    non_deductible_values = render_item_inputs(NON_DEDUCTIBLE_ITEMS, "sec4")
+    st.caption(
+        "**참고** (개인사업자에게 주로 발생하는 불공제 항목 예시)\n"
+        "- 공제받지 못할 매입세액: 사업과 무관한 지출(가사경비), 비영업용 소형승용차(개별소비세 "
+        "과세대상, 8인승 이하 승용차) 구입·유지비, 거래처 접대비 관련 매입세액, 세금계산서를 "
+        "받지 못했거나 필요적 기재사항이 부실한 매입 등\n"
+        "- 공통매입세액 면세사업분: 과세·면세 겸용 사업자가 공통으로 사용한 매입 중 면세사업에 "
+        "대응하는 매입세액\n"
+        "- 대손처분받은 세액: 이미 대손세액공제를 받았던 매출채권을 이후 회수한 경우 등"
+    )
 
     st.divider()
 
