@@ -199,14 +199,12 @@ def _normalize_uploaded_df(grid: pd.DataFrame, source_name: str) -> pd.DataFrame
         if col not in result.columns:
             result[col] = pd.NA
 
-    # 원본 파일을 헤더 없이 읽으면 열 전체가 문자열로 남는 경우가 있어, 숫자 열은 명시적으로 변환합니다.
-    result["공급가액"] = pd.to_numeric(result["공급가액"], errors="coerce")
-    result["세액"] = pd.to_numeric(result["세액"], errors="coerce")
-
     result["구분"] = "일반매입"
     result[SOURCE_COLUMN] = source_name
 
     # 의미 없는 행(합계/소계 행, 가맹점명·금액이 모두 비어있는 행) 제외
+    # 날짜를 datetime으로 바꾸기 전에 걸러야 합니다. "합 계"처럼 날짜가 아닌 텍스트가 거래일자
+    # 칸에 들어있는 경우, datetime 변환 시 NaT가 되어 텍스트 기반 판별이 불가능해지기 때문입니다.
     # NaN을 먼저 빈 문자열로 바꾼 뒤 문자열로 변환해야, pandas 버전에 따라 astype(str)이
     # NaN을 문자열 "nan"으로 바꾸지 않는 경우에도 빈 값이 올바르게 인식됩니다.
     merchant = result["가맹점명"].fillna("").astype(str).str.strip()
@@ -220,6 +218,13 @@ def _normalize_uploaded_df(grid: pd.DataFrame, source_name: str) -> pd.DataFrame
     is_summary_row = summary_text.str.contains("합계|소계|총계|total", case=False, na=False, regex=True)
     is_blank_row = (merchant == "") & supply_num.isna() & tax_num.isna()
     result = result[~(is_summary_row | is_blank_row)]
+
+    # 원본 파일을 헤더 없이 읽으면 열 전체가 문자열로 남는 경우가 있어, 숫자/날짜 열은 명시적으로
+    # 변환합니다. 거래일자가 문자열(예: "2026.06.30")로 남아있으면 표의 DateColumn 설정과 타입이
+    # 맞지 않아 화면 자체가 에러로 멈추므로 반드시 datetime으로 변환해야 합니다.
+    result["공급가액"] = pd.to_numeric(result["공급가액"], errors="coerce")
+    result["세액"] = pd.to_numeric(result["세액"], errors="coerce")
+    result["거래일자"] = pd.to_datetime(result["거래일자"], errors="coerce")
 
     return result[MANUAL_ENTRY_COLUMNS].reset_index(drop=True)
 
