@@ -4,8 +4,9 @@
 카드사 홈페이지에서 내려받은 카드사용내역 파일(엑셀/CSV)을 업로드하거나,
 표에 직접 입력해서 카드사용내역을 정리할 수 있는 페이지입니다.
 
-업로드한 파일은 자동으로 정제되어 '카드사용내역 확인 및 저장' 표에 반영되며,
-표에서 직접 행을 추가하거나 인식된 내용을 수정할 수 있습니다.
+업로드한 파일은 원본 그대로 표로 보여주고, 그중 필요한 항목만 정제해
+'카드사용내역 확인 및 저장' 표에 반영합니다. 이 표에서 직접 행을 추가하거나
+인식된 내용을 수정할 수 있습니다.
 '일반매입'과 '고정자산매입'으로 구분해 합계를 계산하고, '저장' 버튼을 누르면
 값이 확정되어 '매입세액 입력' 탭의 "신용카드매출전표 등 수취명세서 제출분
 (일반매입/고정자산매입)" 항목에 자동으로 반영됩니다.
@@ -72,6 +73,16 @@ def _read_uploaded_table(uploaded_file):
         except UnicodeDecodeError:
             continue
     raise ValueError("CSV 인코딩을 인식하지 못했습니다 (utf-8 / cp949 로 시도했습니다).")
+
+
+def _drop_empty_columns(df: pd.DataFrame):
+    cols_to_drop = []
+    for col in df.columns:
+        stripped = df[col].astype(str).str.strip()
+        is_empty = stripped.isin(["", "nan", "None"]) | df[col].isna()
+        if is_empty.all():
+            cols_to_drop.append(col)
+    return df.drop(columns=cols_to_drop)
 
 
 # 카드사마다 열 이름이 제각각이라, 자주 쓰이는 표현을 표준 항목에 매핑합니다.
@@ -145,8 +156,9 @@ def _normalize_uploaded_df(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
 # ------------------------------------------------------------------
 st.subheader("2. 파일 업로드")
 st.caption(
-    "업로드한 파일은 자동으로 정제되어 아래 '3. 카드사용내역 확인 및 저장' 표에 반영됩니다. "
-    "고정자산매입 건이 섞여 있다면 반영된 표에서 해당 행의 '구분'을 '고정자산매입'으로 바꿔주세요."
+    "업로드한 파일은 아래에 표로 그대로 정리해서 보여주고, 그중 필요한 항목만 정제해 "
+    "'3. 카드사용내역 확인 및 저장' 표에 반영합니다. 고정자산매입 건이 섞여 있다면 반영된 표에서 "
+    "해당 행의 '구분'을 '고정자산매입'으로 바꿔주세요."
 )
 st.markdown(
     "**카드사 홈페이지에서 카드사용내역 받는 방법**\n"
@@ -172,24 +184,38 @@ if not confirmed:
     )
 
     if uploaded_files:
-        new_rows = []
+        raw_parsed_dfs = []
+        new_cleaned_rows = []
         for uploaded_file in uploaded_files:
-            signature = (uploaded_file.name, uploaded_file.size)
-            if signature in st.session_state["card_usage_processed_files"]:
-                continue
             try:
                 raw_df = _read_uploaded_table(uploaded_file)
-                cleaned_df = _normalize_uploaded_df(raw_df, uploaded_file.name)
-                new_rows.append(cleaned_df)
-                st.session_state["card_usage_processed_files"].add(signature)
             except Exception as e:
                 st.error(f"'{uploaded_file.name}' 파일을 읽는 중 오류가 발생했습니다: {e}")
+                continue
 
-        if new_rows:
+            raw_display_df = raw_df.copy()
+            raw_display_df.insert(0, "출처파일", uploaded_file.name)
+            raw_parsed_dfs.append(raw_display_df)
+
+            signature = (uploaded_file.name, uploaded_file.size)
+            if signature not in st.session_state["card_usage_processed_files"]:
+                new_cleaned_rows.append(_normalize_uploaded_df(raw_df, uploaded_file.name))
+                st.session_state["card_usage_processed_files"].add(signature)
+
+        if raw_parsed_dfs:
+            uploaded_df = pd.concat(raw_parsed_dfs, ignore_index=True, sort=False)
+            st.session_state["card_usage_uploaded_df"] = _drop_empty_columns(uploaded_df)
+
+        if new_cleaned_rows:
             st.session_state["card_usage_manual_df"] = pd.concat(
-                [st.session_state["card_usage_manual_df"], *new_rows], ignore_index=True
+                [st.session_state["card_usage_manual_df"], *new_cleaned_rows], ignore_index=True
             )
-            st.success(f"{sum(len(d) for d in new_rows)}건의 내역을 정리해 아래 표에 추가했습니다.")
+            st.success(f"{sum(len(d) for d in new_cleaned_rows)}건의 내역을 정리해 아래 '3. 카드사용내역 확인 및 저장' 표에 추가했습니다.")
+
+if "card_usage_uploaded_df" in st.session_state:
+    st.dataframe(st.session_state["card_usage_uploaded_df"], width='stretch')
+elif not confirmed:
+    st.info("카드사용내역 파일을 업로드하면 표로 정리해서 보여줍니다.")
 
 st.divider()
 
