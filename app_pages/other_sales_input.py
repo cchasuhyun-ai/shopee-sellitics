@@ -95,10 +95,18 @@ tax_total = sum(v["tax"] for v in item_values.values())
 
 st.caption(
     "**입력 예시** (개인사업자가 주로 입력하게 되는 항목)\n"
-    "- 세금계산서 발급분: 국내 거래처에 물품·용역을 공급하고 세금계산서를 발행한 매출\n"
+    "- 세금계산서 발급분: 국내 거래처에 물품·용역을 공급하고 세금계산서를 발행한 매출 "
+    "(홈택스 로그인 → 조회/발급 → 전자세금계산서 → 목록조회(매출) 메뉴에서 신고기간을 지정해 "
+    "발행 내역과 합계를 확인할 수 있습니다.)\n"
     "- 신용카드매출전표 · 현금영수증 발행분: 스마트스토어 등 국내 오픈마켓 판매분, "
-    "매장·사무실에서 카드결제·현금영수증으로 받은 매출\n"
-    "- 기타(정규영수증 외 매출분): 간이영수증만 발행했거나 증빙 없이 현금으로 받은 매출 등"
+    "매장·사무실에서 카드결제·현금영수증으로 받은 매출 (현금영수증 발행분은 홈택스 로그인 → "
+    "조회/발급 → 현금영수증 → 매출내역(사업자) 메뉴에서 조회할 수 있습니다.)\n"
+    "- 기타(정규영수증 외 매출분): 간이영수증만 발행했거나 증빙 없이 현금으로 받은 매출 등\n\n"
+    "**신용카드매출전표(카드 결제분) 자료 받는 방법**\n"
+    "이용 중인 각 카드사(비씨/삼성/신한/국민/현대/롯데카드 등) 홈페이지의 '가맹점/사업자용' 페이지에 "
+    "로그인한 뒤 '매출조회' 또는 '가맹점 매출내역 조회' 메뉴로 들어가, 조회 기간을 이번 신고기간(반기)으로 "
+    "설정하고 '전체 매출내역'을 엑셀(또는 CSV) 파일로 다운로드하세요. 카드사를 여러 곳 이용 중이라면 "
+    "카드사별로 각각 내려받아, 공급가액과 세액(부가가치세) 합계를 더해서 위 표에 입력하면 됩니다."
 )
 
 st.divider()
@@ -160,7 +168,7 @@ if confirmed:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="그밖의매출입력.xlsx",
+            file_name=f"{int(vat_year)}년_{vat_half}_그밖의매출_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("다시 수정하기"):
@@ -172,7 +180,7 @@ else:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="그밖의매출입력.xlsx",
+            file_name=f"{int(vat_year)}년_{vat_half}_그밖의매출_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("저장", type="primary"):
