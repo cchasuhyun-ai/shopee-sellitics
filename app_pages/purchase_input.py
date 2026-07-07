@@ -221,7 +221,7 @@ if not confirmed:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name=f"매입세액_{period_label}.xlsx",
+            file_name=f"{period_label.replace(' ', '_')}_매입세액_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("저장", type="primary"):
@@ -245,7 +245,7 @@ else:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name=f"매입세액_{st.session_state['purchase_tax_period']}.xlsx",
+            file_name=f"{st.session_state['purchase_tax_period'].replace(' ', '_')}_매입세액_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("다시 수정하기"):

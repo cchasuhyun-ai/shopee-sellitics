@@ -173,7 +173,7 @@ if confirmed:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="카드사용내역.xlsx",
+            file_name="카드사용내역_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("다시 수정하기"):
@@ -185,7 +185,7 @@ elif has_uploaded or has_manual:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="카드사용내역.xlsx",
+            file_name="카드사용내역_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("저장", type="primary"):

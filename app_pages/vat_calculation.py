@@ -144,6 +144,6 @@ excel_buffer.seek(0)
 st.download_button(
     label="다운로드",
     data=excel_buffer,
-    file_name=f"부가세계산_{int(vat_year)}년_{vat_half}.xlsx",
+    file_name=f"{int(vat_year)}년_{vat_half}_부가세_계산결과.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
