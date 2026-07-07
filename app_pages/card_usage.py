@@ -75,6 +75,20 @@ def _read_uploaded_table(uploaded_file):
     raise ValueError("CSV 인코딩을 인식하지 못했습니다 (utf-8 / cp949 로 시도했습니다).")
 
 
+def _read_uploaded_grid(uploaded_file):
+    """카드사 파일 상단의 제목·요약정보 등을 그대로 둔 채, 헤더 없이 원본 그리드를 읽어옵니다."""
+    name = uploaded_file.name.lower()
+    data = uploaded_file.getvalue()
+    if name.endswith((".xlsx", ".xls")):
+        return pd.read_excel(io.BytesIO(data), header=None)
+    for encoding in ("utf-8-sig", "cp949"):
+        try:
+            return pd.read_csv(io.BytesIO(data), header=None, encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("CSV 인코딩을 인식하지 못했습니다 (utf-8 / cp949 로 시도했습니다).")
+
+
 def _drop_empty_columns(df: pd.DataFrame):
     cols_to_drop = []
     for col in df.columns:
@@ -85,55 +99,109 @@ def _drop_empty_columns(df: pd.DataFrame):
     return df.drop(columns=cols_to_drop)
 
 
-# 카드사마다 열 이름이 제각각이라, 자주 쓰이는 표현을 표준 항목에 매핑합니다.
-# 사업자등록번호를 먼저 매칭해야 "가맹점사업자번호" 같은 열이 가맹점명으로 잘못 잡히지 않습니다.
+# 카드사마다 열 이름이 제각각이라, 자주 쓰이는 표현을 표준 항목에 매핑합니다. 각 목록은 우선순위
+# 순서이며(앞에 있을수록 먼저 선택), 사업자등록번호를 가맹점명보다 먼저 매칭해야 "가맹점사업자번호"
+# 같은 열이 가맹점명으로 잘못 잡히지 않습니다.
 _COLUMN_KEYWORDS = {
-    "거래일자": ["거래일자", "거래일", "이용일자", "이용일", "승인일자", "승인일", "매입일자", "매입일"],
+    "거래일자": [
+        "매출일자", "매출일", "거래일자", "거래일", "이용일자", "이용일",
+        "승인일자", "승인일", "매입일자", "매입일", "접수일자", "접수일",
+    ],
     "사업자등록번호": ["사업자등록번호", "사업자번호", "가맹점사업자번호", "등록번호"],
     "가맹점명": ["가맹점명", "가맹점", "상호", "거래처명", "거래처", "사용처"],
     "공급가액": ["공급가액", "공급가"],
     "세액": ["부가가치세", "부가세액", "부가세", "세액"],
     "비고": ["비고", "메모", "적요"],
 }
-_AMOUNT_KEYWORDS = ["합계금액", "이용금액", "승인금액", "결제금액", "사용금액", "매입금액", "청구금액", "금액"]
+# 이용금액/매출금액은 보통 공급가액+세액 합계이고, 승인금액은 수수료 등이 더해질 수 있어 후순위로 둡니다.
+_AMOUNT_KEYWORDS = [
+    "이용금액", "매출금액", "합계금액", "결제금액", "사용금액", "매입금액", "청구금액", "승인금액", "금액",
+]
+_ALL_HEADER_KEYWORDS = {kw for keywords in _COLUMN_KEYWORDS.values() for kw in keywords} | set(_AMOUNT_KEYWORDS)
 
 
 def _clean_column_name(col) -> str:
     return str(col).replace(" ", "").replace("\n", "")
 
 
-def _normalize_uploaded_df(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+def _find_header_row(grid: pd.DataFrame, max_scan: int = 30):
+    """제목/요약정보가 위에 붙어있는 카드사 파일에서, 실제 열 이름이 있는 행을 찾습니다."""
+    best_idx, best_score = None, 0
+    for i in range(min(max_scan, len(grid))):
+        score = sum(
+            1
+            for cell in grid.iloc[i]
+            if _clean_column_name(cell) and any(keyword in _clean_column_name(cell) for keyword in _ALL_HEADER_KEYWORDS)
+        )
+        if score > best_score:
+            best_idx, best_score = i, score
+    return best_idx if best_score >= 2 else None
+
+
+def _extract_data_table(grid: pd.DataFrame) -> pd.DataFrame:
+    """헤더 없이 읽은 원본 그리드에서 실제 열 이름 행을 찾아, 그 아래 데이터만 표로 만듭니다."""
+    header_idx = _find_header_row(grid)
+    if header_idx is None:
+        header_idx = 0
+    data = grid.iloc[header_idx + 1 :].copy()
+    data.columns = grid.iloc[header_idx]
+    return data.reset_index(drop=True)
+
+
+def _normalize_uploaded_df(grid: pd.DataFrame, source_name: str) -> pd.DataFrame:
     """카드사 파일마다 다른 열 이름을 표준 항목으로 매핑하고, 의미 없는 행/열을 제외합니다."""
+    df = _extract_data_table(grid)
     matched_cols = set()
     result = pd.DataFrame(index=df.index)
 
     for target, keywords in _COLUMN_KEYWORDS.items():
-        for col in df.columns:
-            if col in matched_cols:
-                continue
-            col_name = _clean_column_name(col)
-            if any(keyword in col_name for keyword in keywords):
-                result[target] = df[col]
-                matched_cols.add(col)
+        for keyword in keywords:
+            found_col = None
+            for col in df.columns:
+                if col in matched_cols:
+                    continue
+                if keyword in _clean_column_name(col):
+                    found_col = col
+                    break
+            if found_col is not None:
+                result[target] = df[found_col]
+                matched_cols.add(found_col)
                 break
 
-    # 공급가액/세액 열을 찾지 못했다면 이용(합계)금액에서 부가세를 역산합니다.
-    if "공급가액" not in result.columns and "세액" not in result.columns:
-        for col in df.columns:
-            if col in matched_cols:
-                continue
-            col_name = _clean_column_name(col)
-            if any(keyword in col_name for keyword in _AMOUNT_KEYWORDS):
-                amount = pd.to_numeric(df[col], errors="coerce")
+    def _find_amount_col():
+        for keyword in _AMOUNT_KEYWORDS:
+            for col in df.columns:
+                if col in matched_cols:
+                    continue
+                if keyword in _clean_column_name(col):
+                    return col
+        return None
+
+    has_supply = "공급가액" in result.columns
+    has_tax = "세액" in result.columns
+
+    # 공급가액/세액 중 하나 이상이 없으면 이용(합계)금액을 이용해 부족한 값을 채웁니다.
+    if not has_supply or not has_tax:
+        amount_col = _find_amount_col()
+        if amount_col is not None:
+            amount = pd.to_numeric(df[amount_col], errors="coerce")
+            matched_cols.add(amount_col)
+            if not has_supply and not has_tax:
                 supply = (amount / 1.1).round()
                 result["공급가액"] = supply
                 result["세액"] = amount - supply
-                matched_cols.add(col)
-                break
+            elif not has_supply:
+                result["공급가액"] = amount - pd.to_numeric(result["세액"], errors="coerce")
+            elif not has_tax:
+                result["세액"] = amount - pd.to_numeric(result["공급가액"], errors="coerce")
 
     for col in ["거래일자", "가맹점명", "사업자등록번호", "공급가액", "세액", "비고"]:
         if col not in result.columns:
             result[col] = pd.NA
+
+    # 원본 파일을 헤더 없이 읽으면 열 전체가 문자열로 남는 경우가 있어, 숫자 열은 명시적으로 변환합니다.
+    result["공급가액"] = pd.to_numeric(result["공급가액"], errors="coerce")
+    result["세액"] = pd.to_numeric(result["세액"], errors="coerce")
 
     result["구분"] = "일반매입"
     result[SOURCE_COLUMN] = source_name
@@ -144,7 +212,12 @@ def _normalize_uploaded_df(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
     merchant = result["가맹점명"].fillna("").astype(str).str.strip()
     supply_num = pd.to_numeric(result["공급가액"], errors="coerce")
     tax_num = pd.to_numeric(result["세액"], errors="coerce")
-    is_summary_row = merchant.str.contains("합계|소계|총계|total", case=False, na=False, regex=True)
+    # "합계"가 가맹점명이 아니라 거래일자 칸에 "합 계"처럼 공백과 함께 들어있는 카드사도 있어,
+    # 두 열을 합쳐서(공백 제거 후) 합계/소계 행 여부를 판단합니다.
+    summary_text = (
+        result["거래일자"].fillna("").astype(str) + merchant
+    ).str.replace(" ", "", regex=False)
+    is_summary_row = summary_text.str.contains("합계|소계|총계|total", case=False, na=False, regex=True)
     is_blank_row = (merchant == "") & supply_num.isna() & tax_num.isna()
     result = result[~(is_summary_row | is_blank_row)]
 
@@ -199,7 +272,11 @@ if not confirmed:
 
             signature = (uploaded_file.name, uploaded_file.size)
             if signature not in st.session_state["card_usage_processed_files"]:
-                new_cleaned_rows.append(_normalize_uploaded_df(raw_df, uploaded_file.name))
+                try:
+                    grid_df = _read_uploaded_grid(uploaded_file)
+                    new_cleaned_rows.append(_normalize_uploaded_df(grid_df, uploaded_file.name))
+                except Exception as e:
+                    st.error(f"'{uploaded_file.name}' 파일을 정리하는 중 오류가 발생했습니다: {e}")
                 st.session_state["card_usage_processed_files"].add(signature)
 
         if raw_parsed_dfs:
