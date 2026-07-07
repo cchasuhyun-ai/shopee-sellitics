@@ -18,7 +18,7 @@ import pandas as pd
 import streamlit as st
 
 from amount_input import amount_input
-from pdf_processor import VAT_HALF_OPTIONS
+from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
 
 st.title("매입세액 입력")
 st.caption("매입 · 부가가치세 매입세액 계산")
@@ -166,6 +166,9 @@ if not confirmed:
     with period_col2:
         report_term = st.radio("과세기간", VAT_HALF_OPTIONS, horizontal=True)
 
+    period_start, period_end, filing_deadline = get_vat_period(int(report_year), report_term)
+    st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
+
     st.divider()
 
     st.subheader("2. 세금계산서 수취분")
@@ -173,12 +176,32 @@ if not confirmed:
     header_cols[1].markdown("**공급가액**")
     header_cols[2].markdown("**세액**")
     tax_invoice_values = render_item_inputs(TAX_INVOICE_ITEMS, "sec1")
+    st.caption(
+        "**홈택스에서 매입세금계산서 조회하는 방법**\n"
+        "1. 홈택스(www.hometax.go.kr) 로그인 → 상단 메뉴 `조회/발급` → `전자세금계산서` → "
+        "`목록조회(매입)`으로 이동합니다.\n"
+        f"2. 조회 기간을 이번 과세기간({period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d})으로 설정하고 "
+        "조회하면 발급받은 매입세금계산서 목록과 공급가액·세액 합계를 확인할 수 있습니다.\n"
+        "3. 결과를 엑셀로 다운로드해 공급가액·세액 합계를 위 표에 입력하세요. 종이(수기)로 받은 "
+        "세금계산서는 홈택스에 조회되지 않으므로 별도로 합산해야 합니다.\n"
+        "4. 고정자산(비품·인테리어·차량 등) 매입분은 '세금계산서 수취분 - 고정자산 매입' 항목에 "
+        "별도로 구분해 입력하세요."
+    )
 
     st.subheader("3. 예정신고 누락분 / 매입자발행 세금계산서")
     header_cols = st.columns([3, 1, 1])
     header_cols[1].markdown("**공급가액**")
     header_cols[2].markdown("**세액**")
     misc_values = render_item_inputs(MISC_ITEMS, "sec2")
+    st.caption(
+        "**참고**\n"
+        "- 예정신고 누락분: 직전 예정신고(또는 확정신고) 때 반영하지 못한 매입세금계산서가 있다면 "
+        "이번 확정신고에 함께 반영하는 항목입니다. 위 '홈택스에서 매입세금계산서 조회하는 방법'과 "
+        "동일하게 조회하되, 조회 기간을 누락분이 발생한 과거 기간으로 바꿔서 확인하세요.\n"
+        "- 매입자발행 세금계산서: 거래상대방이 세금계산서를 발급해주지 않아 관할 세무서의 확인을 받아 "
+        "매입자가 직접 발행한 경우입니다. 홈택스 로그인 → `조회/발급` → `전자세금계산서` → "
+        "`매입자발행세금계산서 발행` 메뉴에서 처리 및 조회할 수 있습니다."
+    )
 
     st.subheader("4. 그 밖의 공제매입세액")
     st.markdown(
@@ -194,7 +217,23 @@ if not confirmed:
     )
     with st.container(key="card_receipt_highlight", border=True):
         card_values = render_card_receipt_items()
+    if not st.session_state.get("card_usage_confirmed", False):
+        st.caption(
+            "**홈택스에서 신용카드매출전표 등 수취내역 조회하는 방법**\n"
+            "국세청 홈택스에 사업용신용카드로 등록해둔 카드라면, 홈택스 로그인 → `조회/발급` → "
+            "`현금영수증·신용카드` → `사업용신용카드 사용내역 조회` 메뉴에서 매입세액공제 대상 여부까지 "
+            "함께 확인할 수 있습니다. 직접 입력하는 대신 '카드사용내역 입력' 탭에서 파일을 업로드하고 "
+            "저장하면 이 항목에 자동으로 반영됩니다."
+        )
     other_values = render_item_inputs(OTHER_DEDUCTIBLE_ITEMS, "sec3")
+    st.caption(
+        "**참고** (그 밖의 공제매입세액 중 자주 발생하는 항목)\n"
+        "- 의제매입세액: 면세로 공급받은 농·축·수산물 등을 원재료로 사용한 경우 공제받는 세액으로, "
+        "홈택스에서 자동 조회되지 않고 매입 자료를 근거로 직접 계산해서 입력해야 합니다.\n"
+        "- 재활용폐자원 등 매입세액: 폐자원 등을 사업자가 아닌 자로부터 매입한 경우로, 역시 직접 계산이 "
+        "필요합니다.\n"
+        "- 위 항목들은 관련 매입 사실이 없다면 0으로 두면 됩니다."
+    )
 
     st.subheader("5. 공제받지 못할 매입세액")
     non_deductible_values = render_item_inputs(NON_DEDUCTIBLE_ITEMS, "sec4")
