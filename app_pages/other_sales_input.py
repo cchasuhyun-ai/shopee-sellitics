@@ -38,7 +38,7 @@ confirmed = st.session_state.get("other_sales_confirmed", False)
 # ------------------------------------------------------------------
 # 1) 신고기간 선택
 # ------------------------------------------------------------------
-st.subheader("1. 부가세 신고기한 설정")
+st.subheader("1. 과세기간 선택")
 
 today = date.today()
 default_half_index = 0 if today.month <= 6 else 1

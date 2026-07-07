@@ -10,9 +10,12 @@
 """
 
 import io
+from datetime import date
 
 import pandas as pd
 import streamlit as st
+
+from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
 
 st.title("카드사용내역 입력")
 st.caption("매입 · 카드사용내역 업로드 및 입력")
@@ -25,6 +28,29 @@ MANUAL_ENTRY_COLUMNS = ["거래일자", "가맹점명", "사업자등록번호",
 CATEGORY_OPTIONS = ["일반매입", "고정자산매입"]
 
 confirmed = st.session_state.get("card_usage_confirmed", False)
+
+# ------------------------------------------------------------------
+# 1) 과세기간 선택
+# ------------------------------------------------------------------
+st.subheader("1. 과세기간 선택")
+
+today = date.today()
+default_half_index = 0 if today.month <= 6 else 1
+
+period_col1, period_col2 = st.columns([1, 5])
+with period_col1:
+    vat_year = st.number_input(
+        "신고연도", min_value=2000, max_value=2100, value=today.year, step=1, key="period_year"
+    )
+with period_col2:
+    vat_half = st.radio(
+        "신고기간(반기)", VAT_HALF_OPTIONS, index=default_half_index, horizontal=True, key="cu_half"
+    )
+
+period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
+st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
+
+st.divider()
 
 
 def _read_uploaded_table(uploaded_file):
@@ -51,9 +77,9 @@ def _drop_empty_columns(df: pd.DataFrame):
 
 
 # ------------------------------------------------------------------
-# 1) 파일 업로드
+# 2) 파일 업로드
 # ------------------------------------------------------------------
-st.subheader("1. 파일 업로드")
+st.subheader("2. 파일 업로드")
 st.caption("업로드한 파일의 내역은 모두 '일반매입'으로 집계됩니다. 고정자산매입 건은 아래 '직접 입력'에서 구분해 추가하세요.")
 
 if not confirmed:
@@ -87,9 +113,9 @@ else:
 st.divider()
 
 # ------------------------------------------------------------------
-# 2) 직접 입력
+# 3) 직접 입력
 # ------------------------------------------------------------------
-st.subheader("2. 직접 입력")
+st.subheader("3. 직접 입력")
 st.write(
     "업로드한 파일에 없는 거래는 아래 표에 직접 추가할 수 있습니다. 표 아래쪽의 + 로 행을 추가하고, "
     "'구분' 열에서 일반매입/고정자산매입을 선택하세요."
@@ -147,9 +173,9 @@ with total_col2:
 st.divider()
 
 # ------------------------------------------------------------------
-# 3) 확인 및 저장
+# 4) 확인 및 저장
 # ------------------------------------------------------------------
-st.subheader("3. 확인 및 저장")
+st.subheader("4. 확인 및 저장")
 
 has_uploaded = "card_usage_uploaded_df" in st.session_state
 has_manual = not edited_df.dropna(how="all").empty
@@ -173,7 +199,7 @@ if confirmed:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="카드사용내역_입력결과.xlsx",
+            file_name=f"{int(vat_year)}년_{vat_half}_카드사용내역_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("다시 수정하기"):
@@ -185,7 +211,7 @@ elif has_uploaded or has_manual:
         st.download_button(
             label="다운로드",
             data=excel_buffer,
-            file_name="카드사용내역_입력결과.xlsx",
+            file_name=f"{int(vat_year)}년_{vat_half}_카드사용내역_입력결과.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         if st.button("저장", type="primary"):
