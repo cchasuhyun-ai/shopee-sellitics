@@ -136,7 +136,7 @@ def build_summary(all_deductible, non_deductible_values):
 
 def render_purchase_results(period_label, summary_df, net_total):
     """계산 결과를 화면에 표시하고, 다운로드용 엑셀 버퍼를 반환합니다."""
-    st.subheader(f"계산 결과 - {period_label}")
+    st.subheader(f"4. 확인 및 저장 - {period_label}")
 
     result_col1, result_col2 = st.columns(2)
     with result_col1:
@@ -155,8 +155,9 @@ confirmed = st.session_state.get("purchase_confirmed", False)
 
 if not confirmed:
     # ------------------------------------------------------------------
-    # 신고 기간 선택
+    # 1) 신고 기간 선택
     # ------------------------------------------------------------------
+    st.subheader("1. 과세기간 선택")
     period_col1, period_col2 = st.columns([1, 5])
     with period_col1:
         report_year = st.number_input(
@@ -167,13 +168,13 @@ if not confirmed:
 
     st.divider()
 
-    st.subheader("세금계산서 수취분")
+    st.subheader("2. 세금계산서 수취분")
     header_cols = st.columns([3, 1, 1])
     header_cols[1].markdown("**공급가액**")
     header_cols[2].markdown("**세액**")
     tax_invoice_values = render_item_inputs(TAX_INVOICE_ITEMS, "sec1")
 
-    st.subheader("예정신고 누락분 / 매입자발행 세금계산서")
+    st.subheader("3. 예정신고 누락분 / 매입자발행 세금계산서")
     header_cols = st.columns([3, 1, 1])
     header_cols[1].markdown("**공급가액**")
     header_cols[2].markdown("**세액**")

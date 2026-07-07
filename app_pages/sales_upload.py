@@ -179,7 +179,10 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
 )
 
-force_ocr = st.checkbox("모든 페이지를 OCR로 처리 (PDF 파일을 스캔하여 그림파일로 인식되는 경우 체크)", value=False)
+force_ocr = st.checkbox(
+    "PDF 안의 글자를 마우스로 드래그해서 선택할 수 없다면 체크하세요 (스캔한 사진처럼 저장된 PDF, 처리 시간이 조금 더 걸릴 수 있어요)",
+    value=False,
+)
 
 # TODO(로그인 연동): 로그인 기능을 붙이면 여기서 현재 로그인한 사용자 정보를 가져와서
 # 아래 처리 결과를 사용자 ID와 함께 저장하도록 확장하면 됩니다.
