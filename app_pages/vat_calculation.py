@@ -23,8 +23,7 @@ from pdf_processor import (
     get_vat_period,
     to_numeric_series,
 )
-
-EXPORT_AMOUNT_COLUMN = "수출신고금액"
+from vat_summary import EXPORT_AMOUNT_COLUMN, build_vat_summary
 
 st.title("부가세 계산")
 st.caption("부가세 · 매출/매입 취합 결과로 신고 금액 계산")
@@ -107,18 +106,8 @@ purchase_summary_df = st.session_state.get("purchase_tax_summary")
 # ------------------------------------------------------------------
 st.subheader("2. 신고 금액 계산 결과")
 
-taxable_base_total = zero_rate_base + regular_sales_base
-output_tax_total = regular_sales_tax  # 영세율분은 세액 0
-payable_tax = output_tax_total - purchase_tax_total
-
-summary_df = pd.DataFrame(
-    [
-        {"구분": "영세율 과세표준 (해외배송/수출)", "공급가액": zero_rate_base, "세액": 0},
-        {"구분": "과세 매출 (일반, 10%)", "공급가액": regular_sales_base, "세액": regular_sales_tax},
-        {"구분": "과세표준 및 매출세액 합계", "공급가액": taxable_base_total, "세액": output_tax_total},
-        {"구분": "매입세액 (차감계)", "공급가액": None, "세액": purchase_tax_total},
-        {"구분": "납부(환급)할 세액", "공급가액": None, "세액": payable_tax},
-    ]
+summary_df, taxable_base_total, output_tax_total, payable_tax = build_vat_summary(
+    zero_rate_base, regular_sales_base, regular_sales_tax, purchase_tax_total
 )
 
 st.dataframe(summary_df, width='stretch', hide_index=True)

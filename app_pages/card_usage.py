@@ -18,6 +18,8 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+import auth
+import db
 from pdf_processor import RAW_DATA_UPLOAD_NOTICE, VAT_HALF_OPTIONS, get_vat_period
 
 st.title("카드사용내역 입력")
@@ -58,6 +60,33 @@ with period_col2:
 
 period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
 st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
+
+# ------------------------------------------------------------------
+# DB 연결 및 이전 저장 결과 불러오기 (로그인한 사용자 단위로 구분)
+# ------------------------------------------------------------------
+db_ready = db.is_db_configured()
+user = auth.current_user()
+filing_id = None
+
+if not db_ready:
+    st.caption("※ Supabase가 아직 연결되지 않아, 이번 브라우저 세션에서만 데이터가 유지됩니다.")
+else:
+    filing_id = db.get_or_create_filing(
+        user["user_id"], int(vat_year), vat_half, user["company_name"]
+    )
+    loaded_flag_key = f"_card_usage_db_loaded_{filing_id}"
+    if loaded_flag_key not in st.session_state:
+        st.session_state[loaded_flag_key] = True
+        if not confirmed and st.session_state["card_usage_manual_df"].empty:
+            saved = db.load_card_usage(filing_id)
+            if saved is not None:
+                st.session_state["card_usage_manual_df"] = saved["rows_df"]
+                st.session_state["card_usage_general_supply"] = saved["general_supply_total"]
+                st.session_state["card_usage_general_tax"] = saved["general_tax_total"]
+                st.session_state["card_usage_fixed_asset_supply"] = saved["fixed_asset_supply_total"]
+                st.session_state["card_usage_fixed_asset_tax"] = saved["fixed_asset_tax_total"]
+                st.session_state["card_usage_confirmed"] = True
+                st.rerun()
 
 st.divider()
 
@@ -383,6 +412,17 @@ elif has_data:
             st.session_state["card_usage_fixed_asset_supply"] = fixed_asset_supply_total
             st.session_state["card_usage_fixed_asset_tax"] = fixed_asset_tax_total
             st.session_state["card_usage_confirmed"] = True
+
+            if filing_id:
+                db.save_card_usage(
+                    filing_id,
+                    edited_df,
+                    general_supply_total,
+                    general_tax_total,
+                    fixed_asset_supply_total,
+                    fixed_asset_tax_total,
+                )
+
             st.rerun()
 else:
     st.info("파일을 업로드하거나 직접 입력한 뒤 저장할 수 있습니다.")

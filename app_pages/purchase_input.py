@@ -18,6 +18,8 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+import auth
+import db
 from amount_input import amount_input
 from pdf_processor import RAW_DATA_UPLOAD_NOTICE, VAT_HALF_OPTIONS, get_vat_period
 
@@ -174,6 +176,30 @@ if not confirmed:
     period_start, period_end, filing_deadline = get_vat_period(int(report_year), report_term)
     st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
 
+    # ------------------------------------------------------------------
+    # DB 연결 및 이전 저장 결과 불러오기 (로그인한 사용자 단위로 구분)
+    # ------------------------------------------------------------------
+    db_ready = db.is_db_configured()
+    user = auth.current_user()
+    filing_id = None
+
+    if not db_ready:
+        st.caption("※ Supabase가 아직 연결되지 않아, 이번 브라우저 세션에서만 데이터가 유지됩니다.")
+    else:
+        filing_id = db.get_or_create_filing(
+            user["user_id"], int(report_year), report_term, user["company_name"]
+        )
+        loaded_flag_key = f"_purchase_tax_db_loaded_{filing_id}"
+        if loaded_flag_key not in st.session_state:
+            st.session_state[loaded_flag_key] = True
+            saved = db.load_purchase_tax(filing_id)
+            if saved is not None:
+                st.session_state["purchase_tax_summary"] = saved["summary_df"]
+                st.session_state["purchase_tax_period"] = f"{int(report_year)}년 {report_term}"
+                st.session_state["purchase_tax_net_total"] = saved["net_tax_total"]
+                st.session_state["purchase_confirmed"] = True
+                st.rerun()
+
     st.divider()
 
     st.subheader("2. 세금계산서 수취분")
@@ -273,6 +299,10 @@ if not confirmed:
             st.session_state["purchase_tax_period"] = period_label
             st.session_state["purchase_tax_net_total"] = net_tax_total
             st.session_state["purchase_confirmed"] = True
+
+            if filing_id:
+                db.save_purchase_tax(filing_id, summary_df, net_tax_total)
+
             st.rerun()
 else:
     st.success(

@@ -16,6 +16,8 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+import auth
+import db
 from amount_input import amount_input
 from pdf_processor import RAW_DATA_UPLOAD_NOTICE, VAT_HALF_OPTIONS, get_vat_period
 
@@ -66,6 +68,44 @@ with period_col2:
 
 period_start, period_end, filing_deadline = get_vat_period(int(vat_year), vat_half)
 st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
+
+# ------------------------------------------------------------------
+# DB 연결 및 이전 저장 결과 불러오기 (로그인한 사용자 단위로 구분)
+# ------------------------------------------------------------------
+db_ready = db.is_db_configured()
+user = auth.current_user()
+filing_id = None
+
+if not db_ready:
+    st.caption("※ Supabase가 아직 연결되지 않아, 이번 브라우저 세션에서만 데이터가 유지됩니다.")
+else:
+    filing_id = db.get_or_create_filing(
+        user["user_id"], int(vat_year), vat_half, user["company_name"]
+    )
+    loaded_flag_key = f"_other_sales_db_loaded_{filing_id}"
+    if loaded_flag_key not in st.session_state:
+        st.session_state[loaded_flag_key] = True
+        if not st.session_state.get("other_sales_confirmed"):
+            saved = db.load_other_sales(filing_id)
+            if saved is not None:
+                summary_df = saved["summary_df"]
+                for item_key, item_label in OTHER_SALES_ITEMS:
+                    row = (
+                        summary_df.loc[summary_df["구분"] == item_label]
+                        if not summary_df.empty and "구분" in summary_df.columns
+                        else pd.DataFrame()
+                    )
+                    supply_val = float(row["공급가액"].iloc[0]) if not row.empty else 0
+                    tax_val = float(row["세액"].iloc[0]) if not row.empty else 0
+                    st.session_state[f"amt_os_{item_key}_supply"] = f"{int(supply_val):,}"
+                    st.session_state[f"amt_os_{item_key}_tax"] = f"{int(tax_val):,}"
+                st.session_state["other_sales_summary"] = summary_df
+                st.session_state["other_sales_supply_total"] = saved["supply_total"]
+                st.session_state["other_sales_tax_total"] = saved["tax_total"]
+                st.session_state["other_sales_evidence"] = saved["evidence_files"]
+                st.session_state["other_sales_period"] = f"{int(vat_year)}년 {vat_half}"
+                st.session_state["other_sales_confirmed"] = True
+                st.rerun()
 
 st.divider()
 
@@ -192,4 +232,8 @@ else:
             st.session_state["other_sales_evidence"] = evidence_files
             st.session_state["other_sales_period"] = f"{int(vat_year)}년 {vat_half}"
             st.session_state["other_sales_confirmed"] = True
+
+            if filing_id:
+                db.save_other_sales(filing_id, summary_df, supply_total, tax_total, evidence_files)
+
             st.rerun()

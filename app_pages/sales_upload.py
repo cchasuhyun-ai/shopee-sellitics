@@ -42,6 +42,8 @@ import pandas as pd
 import streamlit as st
 from openpyxl.styles import Font
 
+import auth
+import db
 from exchange_rate import fetch_exchange_rates, get_currency_for_country, get_display_country_name
 from pdf_processor import (
     RAW_DATA_UPLOAD_NOTICE,
@@ -163,6 +165,35 @@ st.caption(
     "※ 매출 집계는 각 소포수령증의 발송일(선적일) 기준으로 판단합니다. "
     "선택한 신고기간에 속하지 않는 발송일의 주문 건은 아래 원화환산 결과표에서 자동으로 제외됩니다."
 )
+
+# ------------------------------------------------------------------
+# DB 연결 및 이전 저장 결과 불러오기 (로그인한 사용자 단위로 구분)
+# ------------------------------------------------------------------
+db_ready = db.is_db_configured()
+user = auth.current_user()
+filing_id = None
+
+if not db_ready:
+    st.caption("※ Supabase가 아직 연결되지 않아, 이번 브라우저 세션에서만 데이터가 유지됩니다.")
+else:
+    filing_id = db.get_or_create_filing(
+        user["user_id"], int(vat_year), vat_half, user["company_name"]
+    )
+    loaded_flag_key = f"_sales_upload_db_loaded_{filing_id}"
+    if loaded_flag_key not in st.session_state:
+        st.session_state[loaded_flag_key] = True
+        if "combined_df" not in st.session_state and not st.session_state.get("sales_confirmed"):
+            saved = db.load_sales_upload(filing_id)
+            if saved is not None:
+                confirmed_df = saved["confirmed_df"]
+                if not confirmed_df.empty and "출처파일" in confirmed_df.columns:
+                    st.session_state["combined_df"] = confirmed_df
+                    st.session_state["confirmed_df"] = confirmed_df
+                    st.session_state["raw_df"] = saved["raw_df"]
+                    st.session_state["sheet_data"] = saved["sheet_data"]
+                else:
+                    st.session_state["confirmed_df"] = pd.DataFrame(columns=["출처파일"])
+                st.session_state["sales_confirmed"] = True
 
 st.divider()
 
@@ -341,13 +372,13 @@ if "combined_df" in st.session_state:
                 st.session_state["confirmed_df"] = active_df.reset_index(drop=True)
                 st.session_state["sales_confirmed"] = True
 
-                # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
-                # 예시:
-                #   save_result_to_db(
-                #       user_id=user.id,
-                #       combined_df=st.session_state["confirmed_df"],
-                #       raw_df=st.session_state["raw_df"],
-                #   )
+                if filing_id:
+                    db.save_sales_upload(
+                        filing_id,
+                        st.session_state["confirmed_df"],
+                        st.session_state["raw_df"],
+                        st.session_state["sheet_data"],
+                    )
 
                 st.rerun()
     else:
@@ -377,6 +408,7 @@ else:
             st.session_state["confirmed_df"] = pd.DataFrame(columns=["출처파일"])
             st.session_state["sales_confirmed"] = True
 
-            # TODO(로그인 연동): 여기서 확정된 값을 DB에 저장하면 됩니다.
+            if filing_id:
+                db.save_sales_upload(filing_id, st.session_state["confirmed_df"], pd.DataFrame(), {})
 
             st.rerun()

@@ -23,12 +23,67 @@ NAV_ITEMS의 순서를 바꾸면 배지 CSS도 함께 맞춰서 수정해야 합
 
 import streamlit as st
 
+import auth
+import db
 from amount_input import inject_amount_input_css
 from style import inject_app_style
 
 st.set_page_config(page_title="Shopee Sellitics", layout="wide")
 inject_app_style()
 inject_amount_input_css()
+
+
+def render_login_page() -> None:
+    st.title("Shopee Sellitics")
+    st.caption("로그인 후 이용할 수 있습니다.")
+
+    login_tab, signup_tab = st.tabs(["로그인", "회원가입"])
+
+    with login_tab:
+        with st.form("login_form"):
+            email = st.text_input("이메일", key="login_email")
+            password = st.text_input("비밀번호", type="password", key="login_password")
+            submitted = st.form_submit_button("로그인")
+        if submitted:
+            ok, message = auth.sign_in(email.strip(), password)
+            if ok:
+                st.rerun()
+            else:
+                st.error(message)
+
+    with signup_tab:
+        with st.form("signup_form"):
+            company_name = st.text_input("거래처명 (회사명)", key="signup_company_name")
+            email = st.text_input("이메일", key="signup_email")
+            password = st.text_input("비밀번호 (8자 이상)", type="password", key="signup_password")
+            password_confirm = st.text_input(
+                "비밀번호 확인", type="password", key="signup_password_confirm"
+            )
+            submitted = st.form_submit_button("회원가입")
+        if submitted:
+            if not company_name.strip() or not email.strip() or not password:
+                st.error("모든 항목을 입력해주세요.")
+            elif password != password_confirm:
+                st.error("비밀번호가 일치하지 않습니다.")
+            elif len(password) < 8:
+                st.error("비밀번호는 8자 이상이어야 합니다.")
+            else:
+                ok, message = auth.sign_up(email.strip(), password, company_name.strip())
+                if ok:
+                    if auth.is_logged_in():
+                        st.rerun()
+                    st.success(message)
+                else:
+                    st.error(message)
+
+
+if not db.is_db_configured():
+    st.error("Supabase가 아직 연결되지 않아 로그인을 사용할 수 없습니다. .streamlit/secrets.toml을 확인해주세요.")
+    st.stop()
+
+if not auth.is_logged_in():
+    render_login_page()
+    st.stop()
 
 NAV_ITEMS = [
     ("안내", st.Page("app_pages/vat_guide.py", title="부가세 신고안내", default=True)),
@@ -39,6 +94,7 @@ NAV_ITEMS = [
     ("매입", st.Page("app_pages/purchase_input.py", title="매입세액 입력")),
     ("신고", st.Page("app_pages/vat_calculation.py", title="부가세 계산")),
     ("신고", st.Page("app_pages/vat_filing.py", title="부가세 신고")),
+    ("신고", st.Page("app_pages/saved_filings.py", title="저장된 신고내역")),
     ("문의", st.Page("app_pages/contact.py", title="문의하기")),
 ]
 
@@ -68,6 +124,14 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+with st.sidebar:
+    user = auth.current_user()
+    st.markdown(f"**{user['company_name']}**")
+    st.caption(user["email"])
+    if st.button("로그아웃", width="stretch"):
+        auth.sign_out()
+        st.rerun()
 
 navigation = st.navigation([page for _label, page in NAV_ITEMS])
 navigation.run()

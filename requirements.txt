@@ -6,3 +6,4 @@ xlrd
 pytesseract
 pdf2image
 requests
+supabase
