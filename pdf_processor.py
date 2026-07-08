@@ -246,6 +246,31 @@ def _drop_empty_columns(df: pd.DataFrame, protect=()):
     return df.drop(columns=cols_to_drop)
 
 
+# ----------------------------------------------------------------------
+# 구매자(제3자) 개인정보 최소수집
+# ----------------------------------------------------------------------
+# 소포수령증 표에 셀러의 최종 구매자(고객) 이름/주소/연락처 등이 컬럼으로 찍혀 나오는
+# 경우, 부가세 계산에는 필요 없는 식별정보이므로 DB에 영구 저장하기 전에 제거합니다
+# (개인정보 보호법 제16조 최소수집 원칙). 화면 표시/엑셀 다운로드본은 이용자 본인이
+# 참고하도록 그대로 두고, DB 저장 대상 DataFrame에만 이 필터를 적용합니다.
+PII_COLUMN_KEYWORDS = (
+    "수취인", "받는사람", "받는분", "수하인", "고객명", "성명", "이름",
+    "주소", "우편번호", "연락처", "전화", "휴대", "핸드폰", "이메일",
+    "name", "address", "phone", "recipient", "email",
+)
+
+
+def strip_pii_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """컬럼명에 구매자 개인정보로 의심되는 키워드가 포함된 열을 제거한 사본을 반환합니다."""
+    if df is None or df.empty:
+        return df
+    drop_cols = [
+        col for col in df.columns
+        if any(keyword in str(col).lower() for keyword in PII_COLUMN_KEYWORDS)
+    ]
+    return df.drop(columns=drop_cols) if drop_cols else df
+
+
 def build_result_sheets(results_by_file: dict):
     """여러 PDF의 처리 결과를 취합해서 엑셀 시트용 DataFrame들을 만듭니다.
     표제목이 "3.해외배송 내역"인 표만 결과에 포함하고, 그 결과 값이 전혀 들어오지 않는

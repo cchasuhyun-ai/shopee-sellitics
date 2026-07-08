@@ -55,6 +55,7 @@ from pdf_processor import (
     get_vat_period,
     parse_date_flexible,
     process_pdf,
+    strip_pii_columns,
     to_numeric_series,
 )
 
@@ -359,6 +360,12 @@ if "combined_df" in st.session_state:
     excel_buffer.seek(0)
 
     st.caption(RAW_DATA_UPLOAD_NOTICE)
+    st.caption(
+        "※ 소포수령증에 구매자(고객)의 성명·주소·연락처 등이 포함되어 있더라도, "
+        "부가세 계산에 필요하지 않은 항목은 '저장'을 눌러 DB에 저장할 때 자동으로 "
+        "제외됩니다. 지금 다운로드하는 엑셀 파일에는 원본 내용이 그대로 담겨 있으니 "
+        "취급에 주의해 주세요."
+    )
 
     if has_aggregated_table and not confirmed:
         with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
@@ -373,11 +380,14 @@ if "combined_df" in st.session_state:
                 st.session_state["sales_confirmed"] = True
 
                 if filing_id:
+                    # 구매자(제3자) 개인정보 최소수집: 부가세 계산에 불필요한 성명/주소/
+                    # 연락처 등 식별정보 컬럼은 DB에 저장하지 않고, 원본텍스트(raw_df)도
+                    # 이번 세션(엑셀 다운로드)에서만 쓰고 DB에는 남기지 않습니다.
                     db.save_sales_upload(
                         filing_id,
-                        st.session_state["confirmed_df"],
-                        st.session_state["raw_df"],
-                        st.session_state["sheet_data"],
+                        strip_pii_columns(st.session_state["confirmed_df"]),
+                        pd.DataFrame(),
+                        {name: strip_pii_columns(sheet_df) for name, sheet_df in st.session_state["sheet_data"].items()},
                     )
 
                 st.rerun()

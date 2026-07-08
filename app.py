@@ -27,6 +27,7 @@ import auth
 import db
 from amount_input import inject_amount_input_css
 from footer import render_footer
+from legal import CROSS_BORDER_TRANSFER_NOTICE
 from style import inject_app_style
 
 st.set_page_config(page_title="Shopee Sellitics", layout="wide")
@@ -64,6 +65,7 @@ def render_login_page() -> None:
                 "이용약관 및 개인정보처리방침에 동의합니다. (하단 푸터에서 내용을 확인할 수 있습니다)",
                 key="signup_agree_terms",
             )
+            st.caption(f"※ {CROSS_BORDER_TRANSFER_NOTICE}")
             submitted = st.form_submit_button("회원가입")
         if submitted:
             if not company_name.strip() or not email.strip() or not password:
