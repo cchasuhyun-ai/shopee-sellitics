@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 
 from amount_input import amount_input
-from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
+from pdf_processor import RAW_DATA_UPLOAD_NOTICE, VAT_HALF_OPTIONS, get_vat_period
 
 st.title("그 밖의 매출 입력")
 st.caption("매출 · 영세율 외 과세 매출 입력 및 증빙 업로드")
@@ -158,6 +158,8 @@ with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
     evidence_df = pd.DataFrame(evidence_files) if evidence_files else pd.DataFrame(columns=["name", "size"])
     evidence_df.to_excel(writer, sheet_name="증빙파일목록", index=False)
 excel_buffer.seek(0)
+
+st.caption(RAW_DATA_UPLOAD_NOTICE)
 
 if confirmed:
     st.success(

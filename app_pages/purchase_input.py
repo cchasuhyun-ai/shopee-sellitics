@@ -18,7 +18,7 @@ import pandas as pd
 import streamlit as st
 
 from amount_input import amount_input
-from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
+from pdf_processor import RAW_DATA_UPLOAD_NOTICE, VAT_HALF_OPTIONS, get_vat_period
 
 st.title("매입세액 입력")
 st.caption("매입 · 부가가치세 매입세액 계산")
@@ -148,6 +148,9 @@ def render_purchase_results(period_label, summary_df, net_total):
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
         summary_df.to_excel(writer, sheet_name="매입세액", index=False)
     excel_buffer.seek(0)
+
+    st.caption(RAW_DATA_UPLOAD_NOTICE)
+
     return excel_buffer
 
 

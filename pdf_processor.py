@@ -302,6 +302,12 @@ VAT_DATE_COLUMN = "발행일"
 VAT_HALF_OPTIONS = ("상반기", "하반기")
 VAT_META_COLUMNS = ("출처파일", "페이지", "표제목")
 
+RAW_DATA_UPLOAD_NOTICE = (
+    "※ 이 엑셀 파일은 내부 관리·확인용 정리 자료입니다. 홈택스에 증빙자료를 업로드할 때는 "
+    "이 엑셀 파일이 아니라 소포수령증 PDF, 각 카드사에서 다운로드한 카드사용내역 파일 등 "
+    "원본(raw) 데이터를 업로드해야 합니다."
+)
+
 
 def get_vat_period(year: int, half: str):
     """지정한 연도/반기의 부가세 신고 대상기간과 신고기한을 반환.

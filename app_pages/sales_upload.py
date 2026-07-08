@@ -44,6 +44,7 @@ from openpyxl.styles import Font
 
 from exchange_rate import fetch_exchange_rates, get_currency_for_country, get_display_country_name
 from pdf_processor import (
+    RAW_DATA_UPLOAD_NOTICE,
     VAT_DATE_COLUMN,
     VAT_HALF_OPTIONS,
     apply_vat_period_filter,
@@ -325,6 +326,8 @@ if "combined_df" in st.session_state:
             for col_idx in range(1, n_cols + 1):
                 worksheet.cell(row=excel_row, column=col_idx).font = bold_font
     excel_buffer.seek(0)
+
+    st.caption(RAW_DATA_UPLOAD_NOTICE)
 
     if has_aggregated_table and not confirmed:
         with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):

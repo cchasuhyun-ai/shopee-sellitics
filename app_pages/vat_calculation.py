@@ -17,6 +17,7 @@ import pandas as pd
 import streamlit as st
 
 from pdf_processor import (
+    RAW_DATA_UPLOAD_NOTICE,
     VAT_HALF_OPTIONS,
     apply_vat_period_filter,
     get_vat_period,
@@ -99,6 +100,8 @@ if missing_notices:
 
 st.divider()
 
+purchase_summary_df = st.session_state.get("purchase_tax_summary")
+
 # ------------------------------------------------------------------
 # 신고 금액 계산 결과
 # ------------------------------------------------------------------
@@ -141,9 +144,56 @@ with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
     summary_df.to_excel(writer, sheet_name="부가세계산", index=False)
 excel_buffer.seek(0)
 
+st.caption(RAW_DATA_UPLOAD_NOTICE)
+
 st.download_button(
     label="다운로드",
     data=excel_buffer,
     file_name=f"{int(vat_year)}년_{vat_half}_부가세_계산결과.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
+
+st.divider()
+
+# ------------------------------------------------------------------
+# 원가율 분석 (판매가 대비 재고 매입원가 비율)
+# ------------------------------------------------------------------
+st.subheader("3. 원가율 분석")
+st.write(
+    "위에서 집계한 판매가(과세표준 합계)와 '매입세액 입력' 탭에 입력된 상품 매입 관련 "
+    "공급가액을 비교해서, 판매가 대비 재고 매입원가의 비율을 대략적으로 계산해서 보여줍니다."
+)
+
+INVENTORY_PURCHASE_LABELS = (
+    "세금계산서 수취분 - 일반매입",
+    "신용카드매출전표 등 수취명세서 제출분 - 일반매입",
+)
+
+if purchase_summary_df is None or purchase_summary_df.empty:
+    st.warning("'매입세액 입력' 탭에서 저장(확정)된 값이 없어 원가율을 계산할 수 없습니다.")
+else:
+    inventory_mask = purchase_summary_df["구분"].isin(INVENTORY_PURCHASE_LABELS)
+    inventory_cost_total = float(
+        to_numeric_series(purchase_summary_df.loc[inventory_mask, "공급가액"]).fillna(0).sum()
+    )
+
+    if taxable_base_total <= 0:
+        st.warning("판매가(과세표준 합계)가 0원이라 원가율을 계산할 수 없습니다.")
+    else:
+        cost_ratio = inventory_cost_total / taxable_base_total * 100
+
+        cost_ratio_df = pd.DataFrame(
+            [
+                {"구분": "판매가 (과세표준 합계, 공급가액 기준)", "금액": taxable_base_total},
+                {"구분": "재고 매입원가 (추정, 공급가액 기준)", "금액": inventory_cost_total},
+            ]
+        )
+        st.dataframe(cost_ratio_df, width='stretch', hide_index=True)
+        st.metric("판매가 대비 재고 매입원가 비율 (원가율)", f"{cost_ratio:,.1f}%")
+
+st.caption(
+    "※ 재고 매입원가는 '매입세액 입력' 탭에 입력된 '세금계산서 수취분 - 일반매입'과 "
+    "'신용카드매출전표 등 수취명세서 제출분 - 일반매입' 공급가액의 합계로 근사한 값입니다 "
+    "(고정자산 매입, 의제매입세액 등 상품 매입 이외 항목은 제외). 실제 매출원가와는 차이가 "
+    "있을 수 있는 참고용 수치입니다."
 )

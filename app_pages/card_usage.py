@@ -18,7 +18,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from pdf_processor import VAT_HALF_OPTIONS, get_vat_period
+from pdf_processor import RAW_DATA_UPLOAD_NOTICE, VAT_HALF_OPTIONS, get_vat_period
 
 st.title("카드사용내역 입력")
 st.caption("매입 · 카드사용내역 업로드 및 입력")
@@ -356,6 +356,7 @@ if confirmed:
         "값이 확정되어 저장되었습니다. '매입세액 입력' 탭의 신용카드매출전표 등 수취명세서 "
         "제출분(일반매입/고정자산매입) 항목에 자동으로 반영됩니다."
     )
+    st.caption(RAW_DATA_UPLOAD_NOTICE)
     with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
         st.download_button(
             label="다운로드",
@@ -368,6 +369,7 @@ if confirmed:
             st.rerun()
 elif has_data:
     st.write("내역 확인을 마쳤으면 '저장' 버튼을 눌러 값을 확정하세요.")
+    st.caption(RAW_DATA_UPLOAD_NOTICE)
     with st.container(horizontal=True, horizontal_alignment="left", gap="xxsmall"):
         st.download_button(
             label="다운로드",
