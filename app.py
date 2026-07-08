@@ -26,6 +26,7 @@ import streamlit as st
 import auth
 import db
 from amount_input import inject_amount_input_css
+from footer import render_footer
 from style import inject_app_style
 
 st.set_page_config(page_title="Shopee Sellitics", layout="wide")
@@ -75,6 +76,8 @@ def render_login_page() -> None:
                     st.success(message)
                 else:
                     st.error(message)
+
+    render_footer()
 
 
 if not db.is_db_configured():
@@ -135,3 +138,5 @@ with st.sidebar:
 
 navigation = st.navigation([page for _label, page in NAV_ITEMS])
 navigation.run()
+
+render_footer()
