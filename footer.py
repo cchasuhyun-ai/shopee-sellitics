@@ -9,14 +9,19 @@ import streamlit as st
 from legal import PRIVACY_POLICY_TEXT, TERMS_OF_SERVICE_TEXT
 
 
+_DIALOG_CONTENT_HEIGHT = 480
+
+
 @st.dialog("개인정보처리방침")
 def _show_privacy_policy() -> None:
-    st.markdown(PRIVACY_POLICY_TEXT)
+    with st.container(height=_DIALOG_CONTENT_HEIGHT):
+        st.markdown(PRIVACY_POLICY_TEXT)
 
 
 @st.dialog("이용약관")
 def _show_terms_of_service() -> None:
-    st.markdown(TERMS_OF_SERVICE_TEXT)
+    with st.container(height=_DIALOG_CONTENT_HEIGHT):
+        st.markdown(TERMS_OF_SERVICE_TEXT)
 
 
 def render_footer() -> None:
