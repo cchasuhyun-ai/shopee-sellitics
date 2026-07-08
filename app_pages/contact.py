@@ -3,8 +3,8 @@
 ================
 사용자가 담당 세무사에게 문의사항과 증빙·검토자료(PDF, 엑셀 등)를 이메일로 보낼 수 있는
 페이지입니다. 받는 사람의 이메일 주소는 화면에 노출하지 않고, 서버(Streamlit) 쪽에서
-Gmail SMTP를 통해 발송합니다. SMTP 계정 정보는 .streamlit/secrets.toml(깃에는 올라가지
-않음)에서 읽어옵니다.
+SMTP를 통해 발송합니다. SMTP 계정 정보(호스트/포트/계정/비밀번호)는
+.streamlit/secrets.toml(깃에는 올라가지 않음)에서 읽어옵니다.
 """
 
 import smtplib
@@ -30,14 +30,18 @@ def _get_mail_credentials():
         email_secrets = st.secrets["email"]
         smtp_user = email_secrets["smtp_user"]
         smtp_password = email_secrets["smtp_password"]
+        smtp_host = email_secrets.get("smtp_host", "smtp.naver.com")
+        smtp_port = int(email_secrets.get("smtp_port", 587))
     except Exception:
-        return None, None
+        return None, None, None, None
     if not smtp_user or not smtp_password or smtp_password.startswith("REPLACE_"):
-        return None, None
-    return smtp_user, smtp_password
+        return None, None, None, None
+    return smtp_user, smtp_password, smtp_host, smtp_port
 
 
-def send_inquiry_email(smtp_user, smtp_password, sender_name, sender_email, category, message, files):
+def send_inquiry_email(
+    smtp_host, smtp_port, smtp_user, smtp_password, sender_name, sender_email, category, message, files
+):
     """작성한 문의 내용을 첨부파일과 함께 담당자에게 이메일로 발송합니다."""
     safe_name = _sanitize_header(sender_name) or "웹앱 방문자"
     safe_email = _sanitize_header(sender_email)
@@ -57,7 +61,7 @@ def send_inquiry_email(smtp_user, smtp_password, sender_name, sender_email, cate
         part.add_header("Content-Disposition", "attachment", filename=uploaded_file.name)
         msg.attach(part)
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
         server.starttls()
         server.login(smtp_user, smtp_password)
         server.sendmail(smtp_user, [smtp_user], msg.as_string())
@@ -71,7 +75,7 @@ st.write(
     "(PDF, 엑셀 등)을 함께 첨부할 수 있습니다."
 )
 
-smtp_user, smtp_password = _get_mail_credentials()
+smtp_user, smtp_password, smtp_host, smtp_port = _get_mail_credentials()
 mail_configured = bool(smtp_user and smtp_password)
 
 if not mail_configured:
@@ -116,7 +120,15 @@ if submitted:
         try:
             with st.spinner("문의를 전송하는 중입니다..."):
                 send_inquiry_email(
-                    smtp_user, smtp_password, sender_name, sender_email, category, message, attachments or []
+                    smtp_host,
+                    smtp_port,
+                    smtp_user,
+                    smtp_password,
+                    sender_name,
+                    sender_email,
+                    category,
+                    message,
+                    attachments or [],
                 )
             st.success("문의가 정상적으로 전송되었습니다. 빠른 시일 내에 회신 드리겠습니다.")
         except Exception:
