@@ -60,6 +60,10 @@ def render_login_page() -> None:
             password_confirm = st.text_input(
                 "비밀번호 확인", type="password", key="signup_password_confirm"
             )
+            agree_terms = st.checkbox(
+                "이용약관 및 개인정보처리방침에 동의합니다. (하단 푸터에서 내용을 확인할 수 있습니다)",
+                key="signup_agree_terms",
+            )
             submitted = st.form_submit_button("회원가입")
         if submitted:
             if not company_name.strip() or not email.strip() or not password:
@@ -68,6 +72,8 @@ def render_login_page() -> None:
                 st.error("비밀번호가 일치하지 않습니다.")
             elif len(password) < 8:
                 st.error("비밀번호는 8자 이상이어야 합니다.")
+            elif not agree_terms:
+                st.error("이용약관 및 개인정보처리방침에 동의해야 회원가입할 수 있습니다.")
             else:
                 ok, message = auth.sign_up(email.strip(), password, company_name.strip())
                 if ok:
