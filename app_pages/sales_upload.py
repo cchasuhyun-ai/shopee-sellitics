@@ -147,7 +147,7 @@ st.write(
 st.subheader("1. 과세기간 선택")
 
 today = date.today()
-default_half_index = 0 if today.month <= 6 else 1
+default_half_index = 0  # 기본값: 상반기
 
 period_col1, period_col2 = st.columns([1, 5])
 with period_col1:

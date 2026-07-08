@@ -13,6 +13,7 @@
 """
 
 import io
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -161,13 +162,14 @@ if not confirmed:
     # 1) 신고 기간 선택
     # ------------------------------------------------------------------
     st.subheader("1. 과세기간 선택")
+    today = date.today()
     period_col1, period_col2 = st.columns([1, 5])
     with period_col1:
         report_year = st.number_input(
-            "과세연도", min_value=2000, max_value=2100, value=2026, step=1, key="period_year"
+            "과세연도", min_value=2000, max_value=2100, value=today.year, step=1, key="period_year"
         )
     with period_col2:
-        report_term = st.radio("과세기간", VAT_HALF_OPTIONS, horizontal=True)
+        report_term = st.radio("과세기간", VAT_HALF_OPTIONS, index=0, horizontal=True)
 
     period_start, period_end, filing_deadline = get_vat_period(int(report_year), report_term)
     st.info(f"신고 대상기간: {period_start:%Y-%m-%d} ~ {period_end:%Y-%m-%d}  |  신고기한: {filing_deadline}")
