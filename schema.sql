@@ -46,6 +46,15 @@ create table if not exists profiles (
     created_at timestamptz not null default now()
 );
 
+-- 관리자(개인정보취급자) 여부 및 이메일(관리자 화면 표시용) 컬럼.
+-- 기존에 이미 profiles가 있던 프로젝트에서는 아래 alter로 추가되고,
+-- 신규 설치에서는 create table에 컬럼이 없으므로 이 alter가 채워줍니다.
+alter table profiles add column if not exists email text;
+alter table profiles add column if not exists is_admin boolean not null default false;
+
+-- 트리거 도입 이전 가입자는 email이 비어 있으므로 auth.users에서 채워 넣습니다.
+update profiles p set email = u.email from auth.users u where p.id = u.id and p.email is null;
+
 alter table profiles enable row level security;
 
 drop policy if exists "select own profile" on profiles;
@@ -56,6 +65,43 @@ drop policy if exists "update own profile" on profiles;
 create policy "update own profile" on profiles
     for update using (auth.uid() = id);
 
+-- "update own profile" 정책은 본인 프로필의 아무 컬럼이나 바꿀 수 있게 해주는데,
+-- is_admin 컬럼이 생기면 그 자체로 자기 자신을 관리자로 승격시킬 수 있는 구멍이
+-- 됩니다(예: Supabase REST API를 앱 밖에서 직접 호출). 아래 트리거는 앱/PostgREST를
+-- 통한 일반 요청(authenticated/anon role)에서 is_admin 값이 바뀌면 원래 값으로
+-- 되돌리고, SQL Editor(= service_role/슈퍼유저, jwt role 클레임 없음)를 통한 변경만
+-- 허용합니다. 즉 is_admin은 오직 프로젝트 소유자가 SQL Editor에서만 부여할 수 있습니다.
+create or replace function public.prevent_is_admin_self_update()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    if new.is_admin is distinct from old.is_admin
+       and coalesce(current_setting('request.jwt.claim.role', true), '') in ('anon', 'authenticated') then
+        new.is_admin := old.is_admin;
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_prevent_is_admin_self_update on profiles;
+create trigger trg_prevent_is_admin_self_update
+    before update on profiles
+    for each row execute function public.prevent_is_admin_self_update();
+
+-- 관리자는 모든 회원의 프로필(회사명/이메일)을 조회할 수 있습니다(읽기 전용).
+-- is_admin 자체는 이 정책이 적용되는 anon/authenticated 클라이언트로는 절대 바꿀 수
+-- 없고(update 정책이 본인 행에만 열려 있어도 is_admin 컬럼 값 자체는 아래처럼 SQL
+-- Editor에서 직접 올려야 합니다), 반드시 프로젝트 소유자가 Supabase SQL Editor에서
+--   update profiles set is_admin = true where email = '관리자이메일';
+-- 로 수동으로 부여해야 합니다.
+drop policy if exists "admin select all profiles" on profiles;
+create policy "admin select all profiles" on profiles
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
 -- 회원가입(auth.users insert) 시 회원가입 폼에서 넘긴 company_name 메타데이터를
 -- profiles에 자동으로 복사하는 트리거. security definer로 RLS를 우회해서 insert합니다.
 create or replace function public.handle_new_user()
@@ -64,8 +110,8 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-    insert into public.profiles (id, company_name)
-    values (new.id, coalesce(new.raw_user_meta_data ->> 'company_name', new.email));
+    insert into public.profiles (id, company_name, email)
+    values (new.id, coalesce(new.raw_user_meta_data ->> 'company_name', new.email), new.email);
     return new;
 end;
 $$;
@@ -169,3 +215,64 @@ create policy "own purchase_tax" on purchase_tax
     for all
     using (exists (select 1 from vat_filings f where f.id = purchase_tax.filing_id and f.user_id = auth.uid()))
     with check (exists (select 1 from vat_filings f where f.id = purchase_tax.filing_id and f.user_id = auth.uid()));
+
+-- ------------------------------------------------------------
+-- 관리자(개인정보취급자): 전체 회원의 신고 데이터를 읽기 전용으로 조회
+-- ------------------------------------------------------------
+-- "for select"만 추가하므로 기존 "own ..." 정책(for all)과 OR로 합쳐져 본인 데이터에
+-- 대한 쓰기 권한에는 영향이 없고, 관리자(is_admin=true)는 모든 행을 조회만 할 수
+-- 있습니다(수정/삭제 불가). is_admin 부여 방법은 profiles 테이블 정의 부분 참고.
+drop policy if exists "admin select all filings" on vat_filings;
+create policy "admin select all filings" on vat_filings
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
+drop policy if exists "admin select all sales_uploads" on sales_uploads;
+create policy "admin select all sales_uploads" on sales_uploads
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
+drop policy if exists "admin select all other_sales" on other_sales;
+create policy "admin select all other_sales" on other_sales
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
+drop policy if exists "admin select all card_usage" on card_usage;
+create policy "admin select all card_usage" on card_usage
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
+drop policy if exists "admin select all purchase_tax" on purchase_tax;
+create policy "admin select all purchase_tax" on purchase_tax
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
+-- 관리자가 전체 이용자 데이터를 조회한 기록(개인정보 보호법 제28조 개인정보취급자
+-- 접근기록 관리 의무 대응). insert만 허용하고 수정/삭제는 막아 로그 위변조를 방지합니다.
+create table if not exists admin_access_log (
+    id uuid primary key default gen_random_uuid(),
+    admin_id uuid not null references auth.users(id) on delete cascade,
+    admin_email text,
+    viewed_at timestamptz not null default now()
+);
+
+alter table admin_access_log enable row level security;
+
+drop policy if exists "admin insert own access log" on admin_access_log;
+create policy "admin insert own access log" on admin_access_log
+    for insert
+    with check (
+        auth.uid() = admin_id
+        and exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );
+
+drop policy if exists "admin select access log" on admin_access_log;
+create policy "admin select access log" on admin_access_log
+    for select using (
+        exists (select 1 from profiles me where me.id = auth.uid() and me.is_admin)
+    );

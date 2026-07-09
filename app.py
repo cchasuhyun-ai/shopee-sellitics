@@ -15,6 +15,7 @@ Shopee Sellitics 웹앱 진입점
 - [신고] 부가세 계산 (app_pages/vat_calculation.py)
 - [신고] 부가세 신고 (app_pages/vat_filing.py)
 - [문의] 문의하기 (app_pages/contact.py)
+- [관리자] 전체 이용자 데이터 (app_pages/admin.py, profiles.is_admin=true인 계정에게만 노출)
 
 카테고리 그룹 헤더(아코디언) 대신, 각 탭 이름 앞에 작은 배지로 카테고리를
 표시합니다. 배지는 사이드바 목록에서의 순서(nth-child)로 매칭되므로,
@@ -108,6 +109,9 @@ NAV_ITEMS = [
     ("신고", st.Page("app_pages/saved_filings.py", title="저장된 신고내역")),
     ("문의", st.Page("app_pages/contact.py", title="문의하기")),
 ]
+
+if auth.is_admin():
+    NAV_ITEMS.append(("관리자", st.Page("app_pages/admin.py", title="전체 이용자 데이터")))
 
 _badge_content_rules = "\n".join(
     f'[data-testid="stSidebarNavItems"] > *:nth-child({i}) '

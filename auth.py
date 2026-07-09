@@ -27,13 +27,21 @@ def current_user() -> Optional[dict]:
     return st.session_state.get("sb_session")
 
 
-def _store_session(session, company_name: str) -> None:
+def is_admin() -> bool:
+    """관리자(개인정보취급자) 여부. 로그인 시 profiles.is_admin 값을 세션에 담아둔
+    것을 그대로 씁니다(요청마다 다시 조회하지 않음)."""
+    session = current_user()
+    return bool(session and session.get("is_admin"))
+
+
+def _store_session(session, company_name: str, is_admin: bool) -> None:
     st.session_state["sb_session"] = {
         "access_token": session.access_token,
         "refresh_token": session.refresh_token,
         "user_id": session.user.id,
         "email": session.user.email,
         "company_name": company_name,
+        "is_admin": is_admin,
     }
     # db.get_client()가 다음 호출에서 새 토큰으로 클라이언트를 다시 만들도록 캐시를 비웁니다.
     st.session_state.pop("_supabase_client", None)
@@ -55,7 +63,9 @@ def sign_up(email: str, password: str, company_name: str) -> tuple[bool, str]:
     if res.session is None:
         return True, "가입 확인 이메일을 보냈습니다. 메일함에서 링크를 클릭한 뒤 로그인해주세요."
 
-    _store_session(res.session, company_name)
+    # 신규 가입 계정은 항상 is_admin=false로 시작합니다(관리자 권한은 프로젝트
+    # 소유자가 Supabase SQL Editor에서 수동으로만 부여할 수 있습니다. schema.sql 참고).
+    _store_session(res.session, company_name, is_admin=False)
     return True, "가입이 완료되었습니다."
 
 
@@ -67,11 +77,16 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
         return False, "이메일 또는 비밀번호가 올바르지 않습니다. (가입 직후라면 이메일 인증을 먼저 완료해주세요)"
 
     profile = (
-        client.table("profiles").select("company_name").eq("id", res.user.id).limit(1).execute()
+        client.table("profiles")
+        .select("company_name, is_admin")
+        .eq("id", res.user.id)
+        .limit(1)
+        .execute()
     )
     company_name = profile.data[0]["company_name"] if profile.data else res.user.email
+    is_admin = bool(profile.data[0]["is_admin"]) if profile.data else False
 
-    _store_session(res.session, company_name)
+    _store_session(res.session, company_name, is_admin)
     return True, "로그인되었습니다."
 
 

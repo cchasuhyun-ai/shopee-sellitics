@@ -221,3 +221,43 @@ def load_purchase_tax(filing_id: str) -> Optional[dict]:
         "summary_df": _records_to_df(row["summary"]),
         "net_tax_total": row["net_tax_total"],
     }
+
+
+# ------------------------------------------------------------------
+# [관리자] 전체 이용자 신고 데이터 열람 (읽기 전용)
+# ------------------------------------------------------------------
+# 아래 함수들은 schema.sql의 "admin select all ..." RLS 정책에 의존합니다.
+# 로그인한 사용자의 profiles.is_admin이 true가 아니면 DB가 빈 결과만 돌려주므로,
+# 여기서 별도로 권한을 다시 검사하지 않습니다(단일 진실 소스는 RLS).
+
+def list_all_filings() -> list:
+    """관리자 전용: 모든 회원의 신고 건 목록을 최신순으로 반환합니다."""
+    supabase = get_client()
+    result = (
+        supabase.table("vat_filings")
+        .select("id, user_id, client_name, period_year, period_half, updated_at")
+        .order("updated_at", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
+def log_admin_access(admin_id: str, admin_email: str) -> None:
+    """관리자가 전체 이용자 데이터 조회 화면에 들어올 때마다 접근기록을 남깁니다
+    (개인정보 보호법 제28조 개인정보취급자 접근기록 관리 의무 대응)."""
+    supabase = get_client()
+    supabase.table("admin_access_log").insert(
+        {"admin_id": admin_id, "admin_email": admin_email}
+    ).execute()
+
+
+def list_admin_access_log(limit: int = 50) -> list:
+    supabase = get_client()
+    result = (
+        supabase.table("admin_access_log")
+        .select("admin_email, viewed_at")
+        .order("viewed_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
